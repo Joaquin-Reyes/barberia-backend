@@ -75,6 +75,15 @@ app.post("/webhook", async (req, res) => {
    }
 
       const message = messages[0];
+
+        // 🔒 anti-duplicado
+           if (usuarios[from]?.ultimoMensajeId === message.id) {
+              return res.sendStatus(200);
+          }
+
+           usuarios[from].ultimoMensajeId = message.id;
+
+
       const from = message.from;
       const text = message.text?.body;
 
@@ -86,11 +95,12 @@ app.post("/webhook", async (req, res) => {
       // ==============================
 
       if (!usuarios[from]) {
-        usuarios[from] = {
+       usuarios[from] = {
           estado: "inicio",
           servicio: null,
           barbero: null,
-          horario: null
+          horario: null,
+          ultimoMensajeId: null
         };
       }
 
