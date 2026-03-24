@@ -50,7 +50,6 @@ app.get("/webhook", (req, res) => {
     console.log("✅ Webhook verificado");
     res.status(200).send(challenge);
   } else {
-    console.log("❌ Error de verificación");
     res.sendStatus(403);
   }
 });
@@ -66,7 +65,7 @@ app.post("/webhook", async (req, res) => {
     const value = changes?.value;
     const messages = value?.messages;
 
-    // 🔕 Ignorar eventos que no son mensajes
+    // 🔕 Ignorar si no es mensaje
     if (!messages) {
       return res.sendStatus(200);
     }
@@ -89,21 +88,36 @@ app.post("/webhook", async (req, res) => {
         barbero: null,
         horario: null,
         ultimoMensajeId: null,
+        ultimoTimestamp: 0
       };
     }
 
+    const usuario = usuarios[from];
+
     // ==============================
-    // ANTI DUPLICADO
+    // ANTI DUPLICADO POR ID
     // ==============================
 
-    if (usuarios[from].ultimoMensajeId === message.id) {
+    if (usuario.ultimoMensajeId === message.id) {
       console.log("🔁 Mensaje duplicado ignorado");
       return res.sendStatus(200);
     }
 
-    usuarios[from].ultimoMensajeId = message.id;
+    usuario.ultimoMensajeId = message.id;
 
-    const usuario = usuarios[from];
+    // ==============================
+    // ANTI LOOP POR TIMESTAMP
+    // ==============================
+
+    const timestamp = Number(message.timestamp);
+
+    if (timestamp <= usuario.ultimoTimestamp) {
+      console.log("⏱️ Mensaje viejo ignorado");
+      return res.sendStatus(200);
+    }
+
+    usuario.ultimoTimestamp = timestamp;
+
     const mensaje = text?.toLowerCase();
 
     // ==============================
@@ -205,6 +219,7 @@ Cuando quieras, escribime 👍`);
     }
 
     res.sendStatus(200);
+
   } catch (error) {
     console.error("❌ Error en webhook:", error.message);
     res.sendStatus(500);
@@ -225,22 +240,19 @@ async function enviarMensaje(numero, mensaje) {
         messaging_product: "whatsapp",
         to: numero,
         type: "text",
-        text: { body: mensaje },
+        text: { body: mensaje }
       },
       {
         headers: {
           Authorization: `Bearer ${WHATSAPP_TOKEN}`,
-          "Content-Type": "application/json",
-        },
+          "Content-Type": "application/json"
+        }
       }
     );
 
     console.log("✅ Mensaje enviado a", numero);
   } catch (error) {
-    console.error(
-      "❌ Error enviando mensaje:",
-      error.response?.data || error.message
-    );
+    console.error("❌ Error enviando mensaje:", error.response?.data || error.message);
   }
 }
 
