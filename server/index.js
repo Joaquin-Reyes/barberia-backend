@@ -3,8 +3,6 @@ require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
-
-// 🔥 SUPABASE
 const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
@@ -19,24 +17,21 @@ const VERIFY_TOKEN = "mi_token_secreto";
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 
-// 🔥 SUPABASE CONFIG
+// ==============================
+// SUPABASE
+// ==============================
+
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_KEY
 );
 
-// ==============================
-// FUNCIONES SUPABASE
-// ==============================
-
 async function guardarTurno(turno) {
   const { error } = await supabase.from("turnos").insert([turno]);
-
   if (error) {
     console.log("❌ Error guardando:", error);
     return false;
   }
-
   return true;
 }
 
@@ -53,8 +48,24 @@ async function turnoDisponible(hora, barbero) {
   return data.length === 0;
 }
 
+// 🔥 NUEVO: OBTENER TURNOS
+async function obtenerTurnos(telefono) {
+  const { data, error } = await supabase
+    .from("turnos")
+    .select("*")
+    .eq("telefono", telefono)
+    .order("fecha", { ascending: true });
+
+  if (error) {
+    console.log("❌ Error obteniendo turnos:", error);
+    return null;
+  }
+
+  return data;
+}
+
 // ==============================
-// MEMORIA (USUARIOS)
+// MEMORIA
 // ==============================
 
 const usuarios = {};
@@ -67,7 +78,7 @@ app.use(cors());
 app.use(express.json());
 
 // ==============================
-// TEST SERVER
+// TEST
 // ==============================
 
 app.get("/", (req, res) => {
@@ -75,7 +86,7 @@ app.get("/", (req, res) => {
 });
 
 // ==============================
-// WEBHOOK VERIFICATION (GET)
+// WEBHOOK VERIFY
 // ==============================
 
 app.get("/webhook", (req, res) => {
@@ -92,7 +103,7 @@ app.get("/webhook", (req, res) => {
 });
 
 // ==============================
-// WEBHOOK RECEIVER (POST)
+// WEBHOOK
 // ==============================
 
 app.post("/webhook", async (req, res) => {
@@ -111,10 +122,6 @@ app.post("/webhook", async (req, res) => {
     console.log("📱 De:", from);
     console.log("💬 Mensaje:", text);
 
-    // ==============================
-    // INICIALIZAR USUARIO
-    // ==============================
-
     if (!usuarios[from]) {
       usuarios[from] = {
         estado: "inicio",
@@ -128,12 +135,7 @@ app.post("/webhook", async (req, res) => {
 
     const usuario = usuarios[from];
 
-    // ==============================
-    // ANTI DUPLICADO
-    // ==============================
-
     if (usuario.ultimoMensajeId === message.id) {
-      console.log("🔁 Mensaje duplicado ignorado");
       return res.sendStatus(200);
     }
 
@@ -142,7 +144,6 @@ app.post("/webhook", async (req, res) => {
     const timestamp = Number(message.timestamp);
 
     if (timestamp <= usuario.ultimoTimestamp) {
-      console.log("⏱️ Mensaje viejo ignorado");
       return res.sendStatus(200);
     }
 
@@ -151,7 +152,7 @@ app.post("/webhook", async (req, res) => {
     const mensaje = text?.toLowerCase();
 
     // ==============================
-    // LÓGICA DEL BOT
+    // FLUJO
     // ==============================
 
     if (usuario.estado === "inicio") {
@@ -175,6 +176,23 @@ app.post("/webhook", async (req, res) => {
 1️⃣ Corte
 2️⃣ Barba
 3️⃣ Corte + barba`);
+      }
+
+      // 🔥 VER TURNOS
+      if (mensaje === "2") {
+        const turnos = await obtenerTurnos(from);
+
+        if (!turnos || turnos.length === 0) {
+          return await enviarMensaje(from, "📭 No tenés turnos agendados.");
+        }
+
+        let texto = "📅 Tus turnos:\n\n";
+
+        turnos.forEach((t, i) => {
+          texto += `${i + 1}️⃣ ${t.fecha} - ${t.hora}\n💈 ${t.barbero}\n✂️ ${t.servicio}\n\n`;
+        });
+
+        return await enviarMensaje(from, texto);
       }
 
       return await enviarMensaje(from, "😅 Elegí una opción válida (1, 2 o 3)");
@@ -230,8 +248,6 @@ Confirmamos?
 
     if (usuario.estado === "confirmacion") {
       if (mensaje === "1") {
-
-        // 🔥 VALIDAR DISPONIBILIDAD
         const disponible = await turnoDisponible(
           usuario.horario,
           usuario.barbero
@@ -242,7 +258,6 @@ Confirmamos?
           return await enviarMensaje(from, "⚠️ Ese horario ya está ocupado. Elegí otro.");
         }
 
-        // 🔥 GUARDAR EN SUPABASE
         const hoy = new Date().toISOString().split("T")[0];
 
         const ok = await guardarTurno({
@@ -319,7 +334,7 @@ async function enviarMensaje(numero, mensaje) {
 }
 
 // ==============================
-// START SERVER
+// START
 // ==============================
 
 app.listen(PORT, () => {
