@@ -63,7 +63,26 @@ async function obtenerTurnos(telefono) {
   return data;
 }
 
-// 🔥 NUEVO: ELIMINAR TURNO
+// 🔥 NUEVO: horarios dinámicos
+async function obtenerHorariosDisponibles(barbero) {
+  const hoy = new Date().toISOString().split("T")[0];
+
+  const horariosBase = ["10:00", "10:30", "11:00"];
+
+  const { data } = await supabase
+    .from("turnos")
+    .select("hora")
+    .eq("barbero", barbero)
+    .eq("fecha", hoy);
+
+  const ocupados = data.map(t => t.hora);
+
+  const disponibles = horariosBase.filter(h => !ocupados.includes(h));
+
+  return disponibles;
+}
+
+// 🔥 eliminar turno
 async function eliminarTurno(id) {
   const { error } = await supabase
     .from("turnos")
@@ -144,16 +163,13 @@ app.post("/webhook", async (req, res) => {
         horario: null,
         ultimoMensajeId: null,
         ultimoTimestamp: 0,
-        turnos: null // 🔥 nuevo
+        turnos: null
       };
     }
 
     const usuario = usuarios[from];
 
-    // ==============================
-    // ANTI DUPLICADO
-    // ==============================
-
+    // anti duplicado
     if (usuario.ultimoMensajeId === message.id) {
       return res.sendStatus(200);
     }
@@ -171,7 +187,7 @@ app.post("/webhook", async (req, res) => {
     const mensaje = text?.toLowerCase();
 
     // ==============================
-    // FLUJO
+    // INICIO
     // ==============================
 
     if (usuario.estado === "inicio") {
@@ -201,7 +217,6 @@ app.post("/webhook", async (req, res) => {
 3️⃣ Corte + barba`);
       }
 
-      // VER TURNOS
       if (mensaje === "2") {
         const turnos = await obtenerTurnos(from);
 
@@ -218,7 +233,6 @@ app.post("/webhook", async (req, res) => {
         return await enviarMensaje(from, texto);
       }
 
-      // 🔥 CANCELAR
       if (mensaje === "3") {
         const turnos = await obtenerTurnos(from);
 
@@ -266,7 +280,7 @@ app.post("/webhook", async (req, res) => {
     }
 
     // ==============================
-    // AGENDAR
+    // SERVICIO
     // ==============================
 
     if (usuario.estado === "servicio") {
@@ -284,22 +298,39 @@ app.post("/webhook", async (req, res) => {
 3️⃣ El que esté libre`);
     }
 
+    // ==============================
+    // BARBERO (🔥 con horarios dinámicos)
+    // ==============================
+
     if (usuario.estado === "barbero") {
       if (mensaje === "1") usuario.barbero = "Agus";
       else if (mensaje === "2") usuario.barbero = "Lucas";
       else if (mensaje === "3") usuario.barbero = "Cualquiera";
       else return await enviarMensaje(from, "Elegí 1, 2 o 3");
 
+      const horarios = await obtenerHorariosDisponibles(usuario.barbero);
+
+      if (horarios.length === 0) {
+        usuario.estado = "menu";
+        return await enviarMensaje(from, "❌ No hay horarios disponibles hoy");
+      }
+
       usuario.estado = "horario";
 
-      return await enviarMensaje(from, `⏰ Estos son los horarios disponibles:
+      let texto = "⏰ Horarios disponibles:\n\n";
 
-10:00
-10:30
-11:00
+      horarios.forEach(h => {
+        texto += `• ${h}\n`;
+      });
 
-Escribí el horario que querés 👇`);
+      texto += "\nEscribí el horario que querés 👇";
+
+      return await enviarMensaje(from, texto);
     }
+
+    // ==============================
+    // HORARIO
+    // ==============================
 
     if (usuario.estado === "horario") {
       usuario.horario = mensaje;
@@ -316,6 +347,10 @@ Confirmamos?
 1️⃣ Sí
 2️⃣ No`);
     }
+
+    // ==============================
+    // CONFIRMAR
+    // ==============================
 
     if (usuario.estado === "confirmacion") {
       if (mensaje === "1") {
@@ -375,7 +410,7 @@ Cuando quieras, escribime 👍`);
 });
 
 // ==============================
-// ENVIAR MENSAJE
+// MENSAJES
 // ==============================
 
 async function enviarMensaje(numero, mensaje) {
