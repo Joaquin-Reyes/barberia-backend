@@ -4,6 +4,9 @@ const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
 
+// 🔥 SUPABASE
+const { createClient } = require("@supabase/supabase-js");
+
 const app = express();
 
 // ==============================
@@ -15,6 +18,40 @@ const VERIFY_TOKEN = "mi_token_secreto";
 
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+
+// 🔥 SUPABASE CONFIG
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
+
+// ==============================
+// FUNCIONES SUPABASE
+// ==============================
+
+async function guardarTurno(turno) {
+  const { error } = await supabase.from("turnos").insert([turno]);
+
+  if (error) {
+    console.log("❌ Error guardando:", error);
+    return false;
+  }
+
+  return true;
+}
+
+async function turnoDisponible(hora, barbero) {
+  const hoy = new Date().toISOString().split("T")[0];
+
+  const { data } = await supabase
+    .from("turnos")
+    .select("*")
+    .eq("hora", hora)
+    .eq("barbero", barbero)
+    .eq("fecha", hoy);
+
+  return data.length === 0;
+}
 
 // ==============================
 // MEMORIA (USUARIOS)
@@ -65,10 +102,7 @@ app.post("/webhook", async (req, res) => {
     const value = changes?.value;
     const messages = value?.messages;
 
-    // 🔕 Ignorar si no es mensaje
-    if (!messages) {
-      return res.sendStatus(200);
-    }
+    if (!messages) return res.sendStatus(200);
 
     const message = messages[0];
     const from = message.from;
@@ -95,7 +129,7 @@ app.post("/webhook", async (req, res) => {
     const usuario = usuarios[from];
 
     // ==============================
-    // ANTI DUPLICADO POR ID
+    // ANTI DUPLICADO
     // ==============================
 
     if (usuario.ultimoMensajeId === message.id) {
@@ -104,10 +138,6 @@ app.post("/webhook", async (req, res) => {
     }
 
     usuario.ultimoMensajeId = message.id;
-
-    // ==============================
-    // ANTI LOOP POR TIMESTAMP
-    // ==============================
 
     const timestamp = Number(message.timestamp);
 
@@ -200,11 +230,43 @@ Confirmamos?
 
     if (usuario.estado === "confirmacion") {
       if (mensaje === "1") {
+
+        // 🔥 VALIDAR DISPONIBILIDAD
+        const disponible = await turnoDisponible(
+          usuario.horario,
+          usuario.barbero
+        );
+
+        if (!disponible) {
+          usuario.estado = "horario";
+          return await enviarMensaje(from, "⚠️ Ese horario ya está ocupado. Elegí otro.");
+        }
+
+        // 🔥 GUARDAR EN SUPABASE
+        const hoy = new Date().toISOString().split("T")[0];
+
+        const ok = await guardarTurno({
+          nombre: from,
+          telefono: from,
+          servicio: usuario.servicio,
+          barbero: usuario.barbero,
+          fecha: hoy,
+          hora: usuario.horario
+        });
+
         usuario.estado = "inicio";
 
-        return await enviarMensaje(from, `🔥 Listo! Turno agendado 💈✂️
+        if (ok) {
+          return await enviarMensaje(from, `🔥 Turno confirmado
+
+📅 ${hoy}
+⏰ ${usuario.horario}
+💈 ${usuario.barbero}
 
 Te esperamos!`);
+        } else {
+          return await enviarMensaje(from, "❌ Error al guardar turno");
+        }
       }
 
       if (mensaje === "2") {
@@ -227,7 +289,7 @@ Cuando quieras, escribime 👍`);
 });
 
 // ==============================
-// ENVIAR MENSAJE WHATSAPP
+// ENVIAR MENSAJE
 // ==============================
 
 async function enviarMensaje(numero, mensaje) {
