@@ -50,9 +50,11 @@ async function guardarMensajeProcesado(id) {
 
 async function guardarTurno(turno) {
   const { error } = await supabase.from("turnos").insert([{
-  ...turno,
-  recordatorio_enviado: false
-}]);
+    ...turno,
+    recordatorio_24h: false,
+    recordatorio_3h: false
+  }]);
+
   if (error) {
     console.log("❌ Error guardando:", JSON.stringify(error, null, 2));
     return false;
@@ -119,21 +121,13 @@ async function eliminarTurno(id) {
 }
 
 // ==============================
-// 🔔 RECORDATORIOS
+// 🔔 RECORDATORIOS (24h + 3h)
 // ==============================
 
 async function enviarRecordatorios() {
   const ahora = new Date();
-  const en24h = new Date(ahora.getTime() + 24 * 60 * 60 * 1000);
 
-  const hoy = ahora.toISOString().split("T")[0];
-  const mañana = en24h.toISOString().split("T")[0];
-
-  const { data, error } = await supabase
-    .from("turnos")
-    .select("*")
-    .in("fecha", [hoy, mañana])
-    .eq("recordatorio_enviado", false);
+  const { data, error } = await supabase.from("turnos").select("*");
 
   if (error) {
     console.log("❌ Error recordatorios:", error);
@@ -141,18 +135,18 @@ async function enviarRecordatorios() {
   }
 
   for (const turno of data) {
-   const creado = new Date(turno.created_at);
-const diferencia = ahora - creado;
+    const fechaTurno = new Date(`${turno.fecha}T${turno.hora}`);
+    const diferencia = fechaTurno - ahora;
 
+    // 24h
     if (
-  diferencia > 10 * 60 * 1000 && 
-  diferencia < 15 * 60 * 1000
-) {
+      diferencia > 23 * 60 * 60 * 1000 &&
+      diferencia < 25 * 60 * 60 * 1000 &&
+      !turno.recordatorio_24h
+    ) {
       await enviarMensaje(
         turno.telefono,
-        `⏰ Recordatorio de turno
-
-Hola 👋 te recordamos tu turno:
+        `⏰ Recordatorio de turno (mañana)
 
 📅 ${turno.fecha}
 ⏰ ${turno.hora}
@@ -163,10 +157,31 @@ Te esperamos! 🔥`
 
       await supabase
         .from("turnos")
-        .update({ recordatorio_enviado: true })
+        .update({ recordatorio_24h: true })
         .eq("id", turno.id);
+    }
 
-      console.log("📨 Recordatorio enviado a", turno.telefono);
+    // 3h
+    if (
+      diferencia > 2 * 60 * 60 * 1000 &&
+      diferencia < 3 * 60 * 60 * 1000 &&
+      !turno.recordatorio_3h
+    ) {
+      await enviarMensaje(
+        turno.telefono,
+        `🔥 Tu turno es en pocas horas
+
+📅 ${turno.fecha}
+⏰ ${turno.hora}
+💈 ${turno.barbero}
+
+¡No te lo olvides! 💈`
+      );
+
+      await supabase
+        .from("turnos")
+        .update({ recordatorio_3h: true })
+        .eq("id", turno.id);
     }
   }
 }
@@ -221,17 +236,14 @@ app.post("/webhook", async (req, res) => {
     const changes = entry?.changes?.[0];
     const value = changes?.value;
 
-    // 🔒 SOLO mensajes reales
     if (!value?.messages || value.messages.length === 0) return;
 
     const message = value.messages[0];
 
-    // 🔒 SOLO texto
     if (!message.text) return;
 
     const messageId = message.id;
 
-    // 🔥 deduplicación REAL
     if (await mensajeYaProcesado(messageId)) return;
     await guardarMensajeProcesado(messageId);
 
@@ -247,14 +259,11 @@ app.post("/webhook", async (req, res) => {
         servicio: null,
         barbero: null,
         horario: null,
-        ultimoMensajeId: null,
-        ultimoTimestamp: 0,
         turnos: null
       };
     }
 
     const usuario = usuarios[from];
-
     const mensaje = text.toLowerCase();
 
     // ==============================
@@ -443,8 +452,7 @@ Confirmamos?
           servicio: usuario.servicio,
           barbero: usuario.barbero,
           fecha: hoy,
-          hora: usuario.horario,
-          recordatorio_enviado: false
+          hora: usuario.horario
         });
 
         usuario.estado = "inicio";
@@ -517,10 +525,10 @@ app.listen(PORT, () => {
 });
 
 // ==============================
-// 🔁 CRON RECORDATORIOS
+// 🔁 CRON RECORDATORIOS (1 HORA)
 // ==============================
 
 setInterval(() => {
   console.log("⏳ Revisando recordatorios...");
   enviarRecordatorios();
-}, 5 * 60 * 1000);
+}, 60 * 60 * 1000);
