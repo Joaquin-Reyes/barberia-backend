@@ -26,7 +26,10 @@ const supabase = createClient(
   process.env.SUPABASE_KEY
 );
 
-// 🔥 NUEVO: deduplicación persistente
+// ==============================
+// 🔒 DEDUPLICACIÓN MENSAJES
+// ==============================
+
 async function mensajeYaProcesado(id) {
   const { data } = await supabase
     .from("mensajes_procesados")
@@ -42,7 +45,7 @@ async function guardarMensajeProcesado(id) {
 }
 
 // ==============================
-// TURNOS (TODO IGUAL)
+// TURNOS
 // ==============================
 
 async function guardarTurno(turno) {
@@ -84,6 +87,7 @@ async function obtenerTurnos(telefono) {
 
 async function obtenerHorariosDisponibles(barbero) {
   const hoy = new Date().toISOString().split("T")[0];
+
   const horariosBase = ["10:00", "10:30", "11:00"];
 
   const { data } = await supabase
@@ -93,6 +97,7 @@ async function obtenerHorariosDisponibles(barbero) {
     .eq("fecha", hoy);
 
   const ocupados = data.map(t => t.hora);
+
   return horariosBase.filter(h => !ocupados.includes(h));
 }
 
@@ -108,6 +113,59 @@ async function eliminarTurno(id) {
   }
 
   return true;
+}
+
+// ==============================
+// 🔔 RECORDATORIOS
+// ==============================
+
+async function enviarRecordatorios() {
+  const ahora = new Date();
+  const en24h = new Date(ahora.getTime() + 24 * 60 * 60 * 1000);
+
+  const hoy = ahora.toISOString().split("T")[0];
+  const mañana = en24h.toISOString().split("T")[0];
+
+  const { data, error } = await supabase
+    .from("turnos")
+    .select("*")
+    .in("fecha", [hoy, mañana])
+    .eq("recordatorio_enviado", false);
+
+  if (error) {
+    console.log("❌ Error recordatorios:", error);
+    return;
+  }
+
+  for (const turno of data) {
+   const creado = new Date(turno.created_at);
+const diferencia = ahora - creado;
+
+    if (
+  diferencia > 10 * 60 * 1000 && 
+  diferencia < 15 * 60 * 1000
+) {
+      await enviarMensaje(
+        turno.telefono,
+        `⏰ Recordatorio de turno
+
+Hola 👋 te recordamos tu turno:
+
+📅 ${turno.fecha}
+⏰ ${turno.hora}
+💈 ${turno.barbero}
+
+Te esperamos! 🔥`
+      );
+
+      await supabase
+        .from("turnos")
+        .update({ recordatorio_enviado: true })
+        .eq("id", turno.id);
+
+      console.log("📨 Recordatorio enviado a", turno.telefono);
+    }
+  }
 }
 
 // ==============================
@@ -153,7 +211,6 @@ app.get("/webhook", (req, res) => {
 // ==============================
 
 app.post("/webhook", async (req, res) => {
-  // 🔥 RESPONDER RÁPIDO A META
   res.sendStatus(200);
 
   try {
@@ -161,20 +218,18 @@ app.post("/webhook", async (req, res) => {
     const changes = entry?.changes?.[0];
     const value = changes?.value;
 
-    // 🔒 ignorar si no hay mensajes reales
+    // 🔒 SOLO mensajes reales
     if (!value?.messages || value.messages.length === 0) return;
 
     const message = value.messages[0];
 
-    // 🔒 ignorar si no es texto
+    // 🔒 SOLO texto
     if (!message.text) return;
 
     const messageId = message.id;
 
     // 🔥 deduplicación REAL
-    const yaExiste = await mensajeYaProcesado(messageId);
-    if (yaExiste) return;
-
+    if (await mensajeYaProcesado(messageId)) return;
     await guardarMensajeProcesado(messageId);
 
     const from = message.from;
@@ -189,11 +244,14 @@ app.post("/webhook", async (req, res) => {
         servicio: null,
         barbero: null,
         horario: null,
+        ultimoMensajeId: null,
+        ultimoTimestamp: 0,
         turnos: null
       };
     }
 
     const usuario = usuarios[from];
+
     const mensaje = text.toLowerCase();
 
     // ==============================
@@ -277,16 +335,16 @@ app.post("/webhook", async (req, res) => {
       }
 
       const turno = usuario.turnos[index];
+
       const ok = await eliminarTurno(turno.id);
 
       usuario.estado = "inicio";
 
-      return await enviarMensaje(
-        from,
-        ok
-          ? "✅ Turno cancelado correctamente"
-          : "❌ Error al cancelar el turno"
-      );
+      if (ok) {
+        return await enviarMensaje(from, "✅ Turno cancelado correctamente");
+      } else {
+        return await enviarMensaje(from, "❌ Error al cancelar el turno");
+      }
     }
 
     // ==============================
@@ -328,7 +386,11 @@ app.post("/webhook", async (req, res) => {
       usuario.estado = "horario";
 
       let texto = "⏰ Horarios disponibles:\n\n";
-      horarios.forEach(h => (texto += `• ${h}\n`));
+
+      horarios.forEach(h => {
+        texto += `• ${h}\n`;
+      });
+
       texto += "\nEscribí el horario que querés 👇";
 
       return await enviarMensaje(from, texto);
@@ -355,7 +417,7 @@ Confirmamos?
     }
 
     // ==============================
-    // CONFIRMACION
+    // CONFIRMAR
     // ==============================
 
     if (usuario.estado === "confirmacion") {
@@ -367,7 +429,7 @@ Confirmamos?
 
         if (!disponible) {
           usuario.estado = "horario";
-          return await enviarMensaje(from, "⚠️ Ese horario ya está ocupado.");
+          return await enviarMensaje(from, "⚠️ Ese horario ya está ocupado. Elegí otro.");
         }
 
         const hoy = new Date().toISOString().split("T")[0];
@@ -378,32 +440,36 @@ Confirmamos?
           servicio: usuario.servicio,
           barbero: usuario.barbero,
           fecha: hoy,
-          hora: usuario.horario
+          hora: usuario.horario,
+          recordatorio_enviado: false
         });
 
         usuario.estado = "inicio";
 
-        return await enviarMensaje(
-          from,
-          ok
-            ? `🔥 Turno confirmado
+        if (ok) {
+          return await enviarMensaje(from, `🔥 Turno confirmado
 
 📅 ${hoy}
 ⏰ ${usuario.horario}
 💈 ${usuario.barbero}
 
-Te esperamos!`
-            : "❌ Error al guardar turno"
-        );
+Te esperamos!`);
+        } else {
+          return await enviarMensaje(from, "❌ Error al guardar turno");
+        }
       }
 
       if (mensaje === "2") {
         usuario.estado = "inicio";
-        return await enviarMensaje(from, "❌ Turno cancelado");
+
+        return await enviarMensaje(from, `❌ Turno cancelado
+
+Cuando quieras, escribime 👍`);
       }
 
       return await enviarMensaje(from, "Respondé 1 o 2");
     }
+
   } catch (error) {
     console.error("❌ Error en webhook:", error.message);
   }
@@ -435,10 +501,7 @@ async function enviarMensaje(numero, mensaje) {
 
     console.log("✅ Mensaje enviado a", numero);
   } catch (error) {
-    console.error(
-      "❌ Error enviando mensaje:",
-      error.response?.data || error.message
-    );
+    console.error("❌ Error enviando mensaje:", error.response?.data || error.message);
   }
 }
 
@@ -449,3 +512,12 @@ async function enviarMensaje(numero, mensaje) {
 app.listen(PORT, () => {
   console.log(`🔥 Servidor corriendo en puerto ${PORT}`);
 });
+
+// ==============================
+// 🔁 CRON RECORDATORIOS
+// ==============================
+
+setInterval(() => {
+  console.log("⏳ Revisando recordatorios...");
+  enviarRecordatorios();
+}, 5 * 60 * 1000);
