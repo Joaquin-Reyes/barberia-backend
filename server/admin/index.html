@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Panel Admin - Turnos</title>
+</head>
+<body>
+  <h1>📅 Panel de Turnos</h1>
+
+  <input type="date" id="fecha" />
+  <button onclick="cargarTurnos()">Buscar</button>
+
+  <table border="1" id="tabla">
+    <thead>
+      <tr>
+        <th>Nombre</th>
+        <th>Teléfono</th>
+        <th>Servicio</th>
+        <th>Barbero</th>
+        <th>Fecha</th>
+        <th>Hora</th>
+        <th>Acción</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    async function cargarTurnos() {
+      const fecha = document.getElementById("fecha").value;
+
+      const res = await fetch(`/admin/turnos?fecha=${fecha}`);
+      const data = await res.json();
+
+      const tbody = document.querySelector("#tabla tbody");
+      tbody.innerHTML = "";
+
+      data.forEach(turno => {
+        const fila = `
+          <tr>
+            <td>${turno.nombre}</td>
+            <td>${turno.telefono}</td>
+            <td>${turno.servicio}</td>
+            <td>${turno.barbero}</td>
+            <td>${turno.fecha}</td>
+            <td>${turno.hora}</td>
+            <td>
+              <button onclick="eliminar('${turno.id}')">❌</button>
+            </td>
+          </tr>
+        `;
+        tbody.innerHTML += fila;
+      });
+    }
+
+    async function eliminar(id) {
+      if (!confirm("¿Eliminar turno?")) return;
+
+      await fetch(`/admin/turnos/${id}`, {
+        method: "DELETE"
+      });
+
+      cargarTurnos();
+    }
+  </script>
+</body>
+</html>

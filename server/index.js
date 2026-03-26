@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
+const path = require("path"); // 👈 NUEVO
 const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
@@ -138,7 +139,6 @@ async function enviarRecordatorios() {
     const fechaTurno = new Date(`${turno.fecha}T${turno.hora}`);
     const diferencia = fechaTurno - ahora;
 
-    // 24h
     if (
       diferencia > 23 * 60 * 60 * 1000 &&
       diferencia < 25 * 60 * 60 * 1000 &&
@@ -161,7 +161,6 @@ Te esperamos! 🔥`
         .eq("id", turno.id);
     }
 
-    // 3h
     if (
       diferencia > 2 * 60 * 60 * 1000 &&
       diferencia < 3 * 60 * 60 * 1000 &&
@@ -198,6 +197,42 @@ const usuarios = {};
 
 app.use(cors());
 app.use(express.json());
+
+// 👇 PANEL ADMIN (NUEVO)
+app.use("/admin", express.static(path.join(__dirname, "admin")));
+
+// ==============================
+// ADMIN ENDPOINTS (NUEVO)
+// ==============================
+
+app.get("/admin/turnos", async (req, res) => {
+  const { fecha } = req.query;
+
+  let query = supabase.from("turnos").select("*");
+
+  if (fecha) {
+    query = query.eq("fecha", fecha);
+  }
+
+  const { data, error } = await query.order("hora", { ascending: true });
+
+  if (error) return res.status(500).json({ error });
+
+  res.json(data);
+});
+
+app.delete("/admin/turnos/:id", async (req, res) => {
+  const { id } = req.params;
+
+  const { error } = await supabase
+    .from("turnos")
+    .delete()
+    .eq("id", id);
+
+  if (error) return res.status(500).json({ error });
+
+  res.json({ ok: true });
+});
 
 // ==============================
 // TEST
@@ -250,9 +285,6 @@ app.post("/webhook", async (req, res) => {
     const from = message.from;
     const text = message.text.body;
 
-    console.log("📱 De:", from);
-    console.log("💬 Mensaje:", text);
-
     if (!usuarios[from]) {
       usuarios[from] = {
         estado: "inicio",
@@ -266,10 +298,6 @@ app.post("/webhook", async (req, res) => {
     const usuario = usuarios[from];
     const mensaje = text.toLowerCase();
 
-    // ==============================
-    // INICIO
-    // ==============================
-
     if (usuario.estado === "inicio") {
       usuario.estado = "menu";
 
@@ -281,10 +309,6 @@ app.post("/webhook", async (req, res) => {
 2️⃣ Ver mis turnos
 3️⃣ Cancelar turno`);
     }
-
-    // ==============================
-    // MENU
-    // ==============================
 
     if (usuario.estado === "menu") {
       if (mensaje === "1") {
@@ -335,10 +359,6 @@ app.post("/webhook", async (req, res) => {
       return await enviarMensaje(from, "😅 Elegí una opción válida (1, 2 o 3)");
     }
 
-    // ==============================
-    // CANCELAR
-    // ==============================
-
     if (usuario.estado === "cancelar") {
       const index = parseInt(mensaje) - 1;
 
@@ -359,10 +379,6 @@ app.post("/webhook", async (req, res) => {
       }
     }
 
-    // ==============================
-    // SERVICIO
-    // ==============================
-
     if (usuario.estado === "servicio") {
       if (mensaje === "1") usuario.servicio = "Corte";
       else if (mensaje === "2") usuario.servicio = "Barba";
@@ -377,10 +393,6 @@ app.post("/webhook", async (req, res) => {
 2️⃣ Lucas
 3️⃣ El que esté libre`);
     }
-
-    // ==============================
-    // BARBERO
-    // ==============================
 
     if (usuario.estado === "barbero") {
       if (mensaje === "1") usuario.barbero = "Agus";
@@ -408,10 +420,6 @@ app.post("/webhook", async (req, res) => {
       return await enviarMensaje(from, texto);
     }
 
-    // ==============================
-    // HORARIO
-    // ==============================
-
     if (usuario.estado === "horario") {
       usuario.horario = mensaje;
       usuario.estado = "confirmacion";
@@ -427,10 +435,6 @@ Confirmamos?
 1️⃣ Sí
 2️⃣ No`);
     }
-
-    // ==============================
-    // CONFIRMAR
-    // ==============================
 
     if (usuario.estado === "confirmacion") {
       if (mensaje === "1") {
