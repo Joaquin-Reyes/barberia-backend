@@ -202,7 +202,22 @@ const usuarios = {};
 app.use(cors());
 app.use(express.json());
 
+app.post("/barbero/login", (req, res) => {
+  const { nombre } = req.body;
+
+  if (!nombre) return res.status(400).json({ error: "Falta nombre" });
+
+  req.session.barbero = nombre;
+
+  res.json({ ok: true });
+});
+
 // 👇 PANEL ADMIN (NUEVO)
+app.use("/admin/barbero.html", (req, res, next) => {
+  if (req.session.barbero) return next();
+  res.sendFile(path.join(__dirname, "admin/login-barbero.html"));
+});
+
 app.use("/admin", express.static(path.join(__dirname, "admin")));
 
 // ==============================
@@ -285,6 +300,28 @@ app.post("/admin/crear-turno", async (req, res) => {
 });
 
   res.json({ ok: true });
+});
+
+app.get("/barbero/turnos", async (req, res) => {
+  const barbero = req.session.barbero;
+  const { fecha } = req.query;
+
+  if (!barbero) return res.status(401).json({ error: "No autorizado" });
+
+  let query = supabase
+    .from("turnos")
+    .select("*")
+    .eq("barbero", barbero);
+
+  if (fecha) {
+    query = query.eq("fecha", fecha);
+  }
+
+  const { data, error } = await query.order("hora", { ascending: true });
+
+  if (error) return res.status(500).json({ error });
+
+  res.json(data);
 });
 
 // ==============================

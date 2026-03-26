@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Panel Barbero</title>
+</head>
+<body>
+  <h1>💈 Mis turnos</h1>
+
+  <input type="date" id="fecha" />
+  <button onclick="cargar()">Buscar</button>
+
+  <table border="1">
+    <thead>
+      <tr>
+        <th>Cliente</th>
+        <th>Servicio</th>
+        <th>Hora</th>
+      </tr>
+    </thead>
+    <tbody id="tabla"></tbody>
+  </table>
+
+  <script>
+    async function cargar() {
+      const fecha = document.getElementById("fecha").value;
+
+      const res = await fetch(`/barbero/turnos?fecha=${fecha}`);
+      const data = await res.json();
+
+      const tabla = document.getElementById("tabla");
+      tabla.innerHTML = "";
+
+      data.forEach(t => {
+        tabla.innerHTML += `
+          <tr>
+            <td>${t.nombre}</td>
+            <td>${t.servicio}</td>
+            <td>${t.hora}</td>
+          </tr>
+        `;
+      });
+    }
+  </script>
+</body>
+</html>

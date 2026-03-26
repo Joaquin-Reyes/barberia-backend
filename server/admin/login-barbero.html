@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Login Barbero</title>
+</head>
+<body>
+  <h2>💈 Login Barbero</h2>
+
+  <input id="nombre" placeholder="Nombre (Agus, Lucas)" />
+  <button onclick="login()">Entrar</button>
+
+  <script>
+    async function login() {
+      const nombre = document.getElementById("nombre").value;
+
+      const res = await fetch("/barbero/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ nombre })
+      });
+
+      if (res.ok) {
+        window.location.href = "/admin/barbero.html";
+      } else {
+        alert("❌ Error");
+      }
+    }
+  </script>
+</body>
+</html>
