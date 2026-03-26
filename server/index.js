@@ -4,6 +4,7 @@ const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
 const path = require("path"); // 👈 NUEVO
+const session = require("express-session");
 const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
@@ -201,6 +202,12 @@ const usuarios = {};
 
 app.use(cors());
 app.use(express.json());
+
+app.use(session({
+  secret: "clave_super_secreta",
+  resave: false,
+  saveUninitialized: true,
+}));
 
 app.post("/barbero/login", (req, res) => {
   const { nombre } = req.body;
