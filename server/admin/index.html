@@ -7,6 +7,31 @@
 <body>
   <h1>📅 Panel de Turnos</h1>
 
+  <h2>➕ Crear turno</h2>
+
+  <input placeholder="Nombre" id="nombre" />
+  <input placeholder="Teléfono" id="telefono" />
+  
+  <select id="servicio">
+    <option>Corte</option>
+    <option>Barba</option>
+    <option>Corte + barba</option>
+  </select>
+
+  <select id="barbero">
+    <option>Agus</option>
+    <option>Lucas</option>
+  </select>
+
+  <input type="date" id="fechaCrear" />
+  <input placeholder="Hora (ej: 10:00)" id="horaCrear" />
+
+  <button onclick="crearTurno()">Crear</button>
+
+  <hr>
+
+  <h2>🔍 Buscar turnos</h2>
+
   <input type="date" id="fecha" />
   <button onclick="cargarTurnos()">Buscar</button>
 
@@ -26,6 +51,32 @@
   </table>
 
   <script>
+    async function crearTurno() {
+      const turno = {
+        nombre: document.getElementById("nombre").value,
+        telefono: document.getElementById("telefono").value,
+        servicio: document.getElementById("servicio").value,
+        barbero: document.getElementById("barbero").value,
+        fecha: document.getElementById("fechaCrear").value,
+        hora: document.getElementById("horaCrear").value
+      };
+
+      const res = await fetch("/admin/crear-turno", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(turno)
+      });
+
+      if (res.ok) {
+        alert("✅ Turno creado");
+        cargarTurnos();
+      } else {
+        alert("❌ Error al crear turno");
+      }
+    }
+
     async function cargarTurnos() {
       const fecha = document.getElementById("fecha").value;
 

@@ -234,6 +234,46 @@ app.delete("/admin/turnos/:id", async (req, res) => {
   res.json({ ok: true });
 });
 
+// 👇👇👇 NUEVO ENDPOINT
+app.post("/admin/crear-turno", async (req, res) => {
+  const { nombre, telefono, servicio, barbero, fecha, hora } = req.body;
+
+  if (!nombre || !telefono || !servicio || !barbero || !fecha || !hora) {
+    return res.status(400).json({ error: "Faltan datos" });
+  }
+
+  // Verificar si está ocupado
+  const { data } = await supabase
+    .from("turnos")
+    .select("*")
+    .eq("hora", hora)
+    .eq("barbero", barbero)
+    .eq("fecha", fecha);
+
+  if (data.length > 0) {
+    return res.status(400).json({ error: "Horario ocupado" });
+  }
+
+  // Guardar turno
+  const { error } = await supabase.from("turnos").insert([{
+    nombre,
+    telefono,
+    servicio,
+    barbero,
+    fecha,
+    hora,
+    recordatorio_24h: false,
+    recordatorio_3h: false
+  }]);
+
+  if (error) {
+    console.log("❌ Error creando turno:", error);
+    return res.status(500).json({ error: "Error guardando" });
+  }
+
+  res.json({ ok: true });
+});
+
 // ==============================
 // TEST
 // ==============================
