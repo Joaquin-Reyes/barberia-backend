@@ -6,6 +6,8 @@
 <body>
   <h1>💈 Mis turnos</h1>
 
+  <button onclick="logout()">🚪 Cerrar sesión</button>
+
   <input type="date" id="fecha" />
   <button onclick="cargar()">Buscar</button>
 
@@ -40,6 +42,11 @@
         `;
       });
     }
+
+    async function logout() {
+  await fetch("/logout", { method: "POST" });
+  window.location.href = "/admin";
+}
   </script>
 </body>
 </html>

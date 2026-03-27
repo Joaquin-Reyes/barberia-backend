@@ -219,6 +219,12 @@ app.post("/barbero/login", (req, res) => {
   res.json({ ok: true });
 });
 
+app.post("/logout", (req, res) => {
+  req.session.destroy(() => {
+    res.json({ ok: true });
+  });
+});
+
 // 👇 PANEL ADMIN (NUEVO)
 app.use("/admin/barbero.html", (req, res, next) => {
   if (req.session.barbero) return next();
