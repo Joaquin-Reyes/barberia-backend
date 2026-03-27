@@ -206,7 +206,11 @@ app.use(express.json());
 const ADMIN_PASSWORD = "1234";
 
 app.post("/admin/login", (req, res) => {
+  console.log("BODY:", req.body);
+
   const { password } = req.body;
+
+  console.log("PASSWORD RECIBIDA:", password);
 
   if (password === ADMIN_PASSWORD) {
     req.session.auth = true;
