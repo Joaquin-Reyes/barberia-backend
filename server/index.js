@@ -682,7 +682,6 @@ Confirmamos?
 
     if (usuario.estado === "confirmacion") {
       if (mensaje === "1") {
-       const hoy = new Date().toISOString().split("T")[0];
 
 const disponible = await turnoDisponible(
   hoy,
