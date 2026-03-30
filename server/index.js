@@ -681,6 +681,9 @@ Confirmamos?
     }
 
     if (usuario.estado === "confirmacion") {
+
+const hoy = new Date().toISOString().split("T")[0];
+
       if (mensaje === "1") {
 
 const disponible = await turnoDisponible(
@@ -693,8 +696,6 @@ const disponible = await turnoDisponible(
           usuario.estado = "horario";
           return await enviarMensaje(from, "⚠️ Ese horario ya está ocupado. Elegí otro.");
         }
-
-        const hoy = new Date().toISOString().split("T")[0];
 
         const ok = await guardarTurno({
           nombre: from,
