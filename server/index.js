@@ -153,6 +153,21 @@ async function eliminarTurno(id) {
   return true;
 }
 
+async function obtenerTurnos(telefono) {
+  const { data, error } = await supabase
+    .from("turnos")
+    .select("*")
+    .eq("telefono", telefono)
+    .order("fecha", { ascending: true });
+
+  if (error) {
+    console.log("❌ Error obteniendo turnos:", error);
+    return [];
+  }
+
+  return data;
+}
+
 // ==============================
 // 🔔 RECORDATORIOS (24h + 3h)
 // ==============================
