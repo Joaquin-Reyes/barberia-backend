@@ -117,15 +117,17 @@ async function obtenerHorariosDisponibles(barbero) {
 let horaActual = formatearHora(hora_inicio);
 const horaFin = formatearHora(hora_fin);
 
-  while (horaActual < hora_fin) {
-    horariosBase.push(horaActual);
+  while (true) {
+  horariosBase.push(horaActual);
 
-    const [h, m] = horaActual.split(":").map(Number);
-    const date = new Date();
-    date.setHours(h, m + 30);
+  if (horaActual >= horaFin) break;
 
-    horaActual = date.toTimeString().slice(0, 5);
-  }
+  const [h, m] = horaActual.split(":").map(Number);
+  const date = new Date();
+  date.setHours(h, m + 30);
+
+  horaActual = date.toTimeString().slice(0, 5);
+}
 
   // filtrar ocupados
   const { data: turnos } = await supabase
@@ -134,7 +136,17 @@ const horaFin = formatearHora(hora_fin);
     .eq("barbero", barbero)
     .eq("fecha", hoy);
 
-  const ocupados = (turnos || []).map(t => t.hora);
+  const ocupados = (turnos || []).map(t =>
+  String(t.hora).slice(0, 5)
+);
+
+if (horariosBase.length === 0) {
+  console.log("⚠️ No se generaron horarios base");
+  return ["10:00", "10:30", "11:00"];
+}
+
+  console.log("🧪 horariosBase:", horariosBase);
+console.log("🧪 ocupados:", ocupados);
 
   return horariosBase.filter(h => !ocupados.includes(h));
 }
