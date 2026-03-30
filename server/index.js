@@ -107,13 +107,16 @@ async function obtenerTurnos(telefono) {
 async function obtenerHorariosDisponibles(barbero) {
   const hoy = new Date().toISOString().split("T")[0];
 
-  const { data: barberData } = await supabase
+const { data: barberData, error } = await supabase
   .from("barberos")
   .select("*")
-  .eq("nombre", barbero)
-  .single();
+  .ilike("nombre", barbero)
+  .maybeSingle();
 
-if (!barberData) return [];
+if (error || !barberData) {
+  console.log("❌ No se encontró barbero:", barbero);
+  return [];
+}
 
 const { hora_inicio, hora_fin } = barberData;
 
