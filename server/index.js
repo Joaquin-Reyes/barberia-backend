@@ -180,6 +180,22 @@ async function obtenerTurnos(telefono) {
   return data;
 }
 
+async function turnoDisponible(fecha, hora, barbero) {
+  const { data, error } = await supabase
+    .from("turnos")
+    .select("*")
+    .eq("hora", hora)
+    .eq("barbero", barbero)
+    .eq("fecha", fecha);
+
+  if (error) {
+    console.log("❌ Error verificando disponibilidad:", error);
+    return false;
+  }
+
+  return data.length === 0;
+}
+
 // ==============================
 // 🔔 RECORDATORIOS (24h + 3h)
 // ==============================
@@ -666,10 +682,13 @@ Confirmamos?
 
     if (usuario.estado === "confirmacion") {
       if (mensaje === "1") {
-        const disponible = await turnoDisponible(
-          usuario.horario,
-          usuario.barbero
-        );
+       const hoy = new Date().toISOString().split("T")[0];
+
+const disponible = await turnoDisponible(
+  hoy,
+  usuario.horario,
+  usuario.barbero
+);
 
         if (!disponible) {
           usuario.estado = "horario";
