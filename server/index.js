@@ -406,67 +406,79 @@ app.put("/turnos/:id/estado", async (req, res) => {
 app.post("/admin/crear-turno", async (req, res) => {
   const { nombre, telefono, servicio, barbero, fecha, hora } = req.body;
 
+  console.log("🧪 Endpoint ADMIN crear turno");
+  console.log("🧪 Barbero recibido desde panel:", barbero);
+
   if (!nombre || !telefono || !servicio || !barbero || !fecha || !hora) {
     return res.status(400).json({ error: "Faltan datos" });
   }
 
-  // 🔹 Verificar si está ocupado
-  const { data: turnosExistentes, error: errorBusqueda } = await supabase
-    .from("turnos")
-    .select("*")
-    .eq("hora", hora)
-    .eq("barbero", barbero)
-    .eq("fecha", fecha);
+  try {
+    // 🔹 Verificar si está ocupado
+    const { data: turnosExistentes, error: errorBusqueda } = await supabase
+      .from("turnos")
+      .select("*")
+      .eq("hora", hora)
+      .eq("barbero", barbero)
+      .eq("fecha", fecha);
 
-  if (errorBusqueda) {
-    console.log("❌ Error verificando turnos:", errorBusqueda);
-    return res.status(500).json({ error: "Error verificando disponibilidad" });
+    if (errorBusqueda) {
+      console.log("❌ Error verificando turnos:", errorBusqueda);
+      return res.status(500).json({ error: "Error verificando disponibilidad" });
+    }
+
+    if (turnosExistentes.length > 0) {
+      return res.status(400).json({ error: "Horario ocupado" });
+    }
+
+    // 🔹 Guardar turno
+    const { error: errorInsert } = await supabase.from("turnos").insert([{
+      nombre,
+      telefono,
+      servicio,
+      barbero,
+      fecha,
+      hora,
+      recordatorio_24h: false,
+      recordatorio_3h: false
+    }]);
+
+    if (errorInsert) {
+      console.log("❌ Error creando turno:", errorInsert);
+      return res.status(500).json({ error: "Error guardando" });
+    }
+
+    // 🔹 Obtener teléfono del barbero (case insensitive)
+    const { data: barberoData, error: errorBarbero } = await supabase
+      .from("barberos")
+      .select("telefono, nombre")
+      .ilike("nombre", barbero)
+      .single();
+
+    console.log("📱 Telefono barbero encontrado:", barberoData?.telefono);
+
+    if (errorBarbero) {
+      console.log("❌ Error obteniendo barbero:", errorBarbero);
+    }
+
+    // 🔹 Notificar al barbero
+    console.log("🧪 Llamando a notificarBarbero desde ADMIN");
+
+    await notificarBarbero({
+      nombre,
+      servicio,
+      barbero,
+      fecha,
+      hora,
+      telefono: barberoData?.telefono
+    });
+
+    res.json({ ok: true });
+
+  } catch (err) {
+    console.log("❌ Error general:", err);
+    res.status(500).json({ error: "Error interno" });
   }
-
-  if (turnosExistentes.length > 0) {
-    return res.status(400).json({ error: "Horario ocupado" });
-  }
-
-  // 🔹 Guardar turno
-  const { error: errorInsert } = await supabase.from("turnos").insert([{
-    nombre,
-    telefono,
-    servicio,
-    barbero,
-    fecha,
-    hora,
-    recordatorio_24h: false,
-    recordatorio_3h: false
-  }]);
-
-  if (errorInsert) {
-    console.log("❌ Error creando turno:", errorInsert);
-    return res.status(500).json({ error: "Error guardando" });
-  }
-
-  // 🔹 Obtener teléfono del barbero desde la DB
-  const { data: barberoData, error: errorBarbero } = await supabase
-    .from("barberos")
-    .select("telefono, nombre")
-    .eq("nombre", barbero)
-    .single();
-    console.log("📱 Telefono barbero:", barberoData?.telefono);
-
-  if (errorBarbero) {
-    console.log("❌ Error obteniendo barbero:", errorBarbero);
-  }
-
-  // 🔹 Notificar al barbero
-  await notificarBarbero({
-    nombre,
-    servicio,
-    barbero,
-    fecha,
-    hora,
-    telefono: barberoData?.telefono
-  });
-
-  res.json({ ok: true });
 });
 // ==============================
 // TEST
@@ -781,14 +793,13 @@ async function notificarBarbero(datos) {
     const { data: barberoData, error } = await supabase
       .from("barberos")
       .select("telefono")
-      .eq("nombre", datos.barbero)
-      .single();
+      .ilike("nombre", datos.barbero);
 
     if (error) {
       console.log("❌ Error buscando teléfono:", error);
     }
 
-    telefono = barberoData?.telefono;
+    telefono = barberoData?.[0]?.telefono;
   }
 
   if (!telefono) {
