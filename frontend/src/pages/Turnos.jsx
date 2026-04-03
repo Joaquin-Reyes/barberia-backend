@@ -44,10 +44,11 @@ const getRowColor = (estado) => {
   const [busqueda, setBusqueda] = useState("");
   const [filtroFecha, setFiltroFecha] = useState("");
 
-  useEffect(() => {
-    traerTurnos();
-    traerBarberos();
-  }, []);
+ useEffect(() => {
+  if (!user) return;
+  traerTurnos();
+  traerBarberos();
+}, [user]);
 
   useEffect(() => {
   if (!nuevo.barbero || !nuevo.fecha) return;
@@ -57,6 +58,7 @@ const getRowColor = (estado) => {
       .from("barberos")
       .select("*")
       .eq("nombre", nuevo.barbero)
+      .eq("barberia_id", user.barberia_id)
       .single();
 
     if (data) {
@@ -76,13 +78,17 @@ const getRowColor = (estado) => {
     const { data } = await supabase
       .from("turnos")
       .select("*")
+      .eq("barberia_id", user.barberia_id)
       .order("fecha", { ascending: true });
 
     setTurnos(data || []);
   }
 
  async function traerBarberos() {
-  const { data, error } = await supabase.from("barberos").select("*");
+  const { data, error } = await supabase
+  .from("barberos")
+  .select("*")
+  .eq("barberia_id", user.barberia_id);
 
   console.log("BARBEROS:", data);
   console.log("ERROR:", error);
@@ -109,6 +115,7 @@ const getRowColor = (estado) => {
       .from("barberos")
       .select("*")
       .eq("nombre", barberoNombre)
+      .eq("barberia_id", user.barberia_id)
       .single();
 
     if (data) {
