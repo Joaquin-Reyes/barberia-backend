@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase, guardarTurno, turnoDisponible } from "../lib/supabase";
 
-const API = "https://barberia-backend-production-7dae.up.railway.app/";
+const API = "https://barberia-backend-production-7dae.up.railway.app";
 
 // 🎨 colores de estado
 const estadoColores = {
