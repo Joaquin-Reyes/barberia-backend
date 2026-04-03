@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase, guardarTurno, turnoDisponible } from "../lib/supabase";
 
-const API = "http://localhost:3000";
+const API = "https://barberia-backend-production-8717.up.railway.app";
 
 // 🎨 colores de estado
 const estadoColores = {
@@ -275,23 +275,36 @@ const mostrarToast = (mensaje, tipo = "success") => {
         return;
       }
 
-      const ok = await guardarTurno(nuevo);
+      try {
+  const res = await fetch(`${API}/admin/crear-turno`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(nuevo),
+  });
 
-      if (ok) {
-        mostrarToast("Turno creado correctamente 💈", "success");
+  const data = await res.json();
 
-        traerTurnos();
-        setNuevo({
-          nombre: "",
-          telefono: "",
-          servicio: "",
-          barbero: "",
-          fecha: "",
-          hora: "",
-        });
-      } else {
-        mostrarToast("Error al crear turno ❌", "error");
-      }
+  if (res.ok) {
+    mostrarToast("Turno creado correctamente 💈", "success");
+
+    traerTurnos();
+    setNuevo({
+      nombre: "",
+      telefono: "",
+      servicio: "",
+      barbero: "",
+      fecha: "",
+      hora: "",
+    });
+  } else {
+    mostrarToast(data.error || "Error al crear turno ❌", "error");
+  }
+} catch (error) {
+  console.error("ERROR:", error);
+  mostrarToast("Error de conexión ❌", "error");
+}
     }}
     className="bg-blue-600 w-full md:w-auto md:px-8 py-2 rounded"
   >
