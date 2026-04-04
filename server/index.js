@@ -14,6 +14,7 @@ const cors = require("cors");
 const path = require("path"); // 👈 NUEVO
 const session = require("express-session");
 const { createClient } = require("@supabase/supabase-js");
+const authMiddleware = require("./middleware/auth");
 
 const app = express();
 
@@ -285,6 +286,19 @@ app.use(session({
   saveUninitialized: true,
 }));
 
+// ==============================
+// TEST AUTH (DEBUG)
+// ==============================
+
+app.get("/test", authMiddleware, (req, res) => {
+  console.log("USER:", req.user);
+
+  res.json({
+    ok: true,
+    user: req.user,
+  });
+});
+
 const ADMIN_PASSWORD = "1234";
 
 app.post("/admin/login", (req, res) => {
@@ -326,11 +340,13 @@ app.use("/admin/barbero.html", (req, res, next) => {
 });
 
 // 👇👇👇 NUEVO ENDPOINT
-app.post("/admin/crear-turno", async (req, res) => {
-  const { nombre, telefono, servicio, barbero, fecha, hora, barberia_id } = req.body;
+app.post("/admin/crear-turno", authMiddleware, async (req, res) => {
+  const { nombre, telefono, servicio, barbero, fecha, hora } = req.body;
 
   console.log("🧪 Endpoint ADMIN crear turno");
   console.log("🧪 Barbero recibido desde panel:", barbero);
+
+  const barberia_id = req.user.barberia_id;
 
   if (!nombre || !telefono || !servicio || !barbero || !fecha || !hora) {
     return res.status(400).json({ error: "Faltan datos" });

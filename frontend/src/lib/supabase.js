@@ -1,11 +1,40 @@
 import { createClient } from '@supabase/supabase-js'
 
+// 🔥 CONFIG SUPABASE (usar ANON PUBLIC KEY)
 const supabaseUrl = 'https://uqqhiwnfjpfqikcfykfr.supabase.co'
-const supabaseKey = 'sb_publishable_uXKYHvjtcAT1Nym4ahffBg_Uw81drxy'
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxcWhpd25manBmcWlrY2Z5a2ZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMjQyNjksImV4cCI6MjA4OTkwMDI2OX0.e44LZF1eMzcqtwLmfVSRP5w2ak2ufK6r6Tr42BzQT8I' // 👈 CAMBIAR ESTO
 
 export const supabase = createClient(supabaseUrl, supabaseKey)
 
-// 👉 FUNCIÓN PARA GUARDAR
+
+// ==============================
+// 🔐 AUTH
+// ==============================
+
+// 👉 LOGIN REAL CON SUPABASE
+export async function login(email, password) {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    console.error("Error login:", error.message);
+    return null;
+  }
+
+  // 🔥 GUARDAR TOKEN
+  localStorage.setItem("token", data.session.access_token);
+
+  return data;
+}
+
+
+// ==============================
+// 📅 TURNOS
+// ==============================
+
+// 👉 GUARDAR TURNO
 export async function guardarTurno(turno) {
   const { error } = await supabase
     .from('turnos')
@@ -19,7 +48,7 @@ export async function guardarTurno(turno) {
   return true
 }
 
-// 👉 FUNCIÓN PARA VALIDAR DISPONIBILIDAD
+// 👉 VALIDAR DISPONIBILIDAD
 export async function turnoDisponible(fecha, hora, barbero) {
   const { data, error } = await supabase
     .from("turnos")
