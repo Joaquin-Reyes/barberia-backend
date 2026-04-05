@@ -747,6 +747,76 @@ app.post("/webhook", async (req, res) => {
 3️⃣ Corte + barba`);
     }
 
+
+    // ==============================
+// 🔥 DETECCIÓN INTELIGENTE SIMPLE
+// ==============================
+
+// detectar "mañana"
+const esManana = mensaje.includes("mañana");
+
+// detectar hora (número tipo 18, 19, etc.)
+const matchHora = mensaje.match(/\b([0-2]?[0-9])\b/);
+const horaDetectada = matchHora ? matchHora[1] : null;
+
+// detectar barbero
+let barberoDetectado = null;
+if (mensaje.includes("agus")) barberoDetectado = "Agus";
+if (mensaje.includes("lucas")) barberoDetectado = "Lucas";
+
+// 👉 si detectamos algo útil
+if (esManana || horaDetectada || barberoDetectado) {
+
+  if (barberoDetectado) usuario.barbero = barberoDetectado;
+  if (horaDetectada) usuario.horario = horaDetectada;
+
+  // setear servicio por defecto si no eligió
+  if (!usuario.servicio) usuario.servicio = "Corte";
+
+  // avanzar estado inteligentemente
+  if (!usuario.barbero) {
+    usuario.estado = "barbero";
+    return await enviarMensaje(from, `💈 ¿Con quién querés atenderte?
+
+1️⃣ Agus
+2️⃣ Lucas
+3️⃣ El que esté libre`);
+  }
+
+  if (!usuario.horario) {
+    usuario.estado = "horario";
+
+    const horarios = await obtenerHorariosDisponibles(
+      usuario.barbero,
+      barberia_id
+    );
+
+    if (!horarios || horarios.length === 0) {
+      return await enviarMensaje(from, "❌ No hay horarios disponibles");
+    }
+
+    let texto = "⏰ Horarios disponibles:\n\n";
+    horarios.forEach(h => texto += `• ${h}\n`);
+    texto += "\nElegí uno 👇";
+
+    return await enviarMensaje(from, texto);
+  }
+
+  // si ya tiene todo → ir a confirmación
+  usuario.estado = "confirmacion";
+
+  return await enviarMensaje(from, `🔥 Te propongo este turno:
+
+✂️ ${usuario.servicio}
+💈 ${usuario.barbero}
+⏰ ${usuario.horario}
+
+Confirmamos?
+
+1️⃣ Sí
+2️⃣ No`);
+}
+
     // ==============================
     // 🤖 FLUJO BOT (fallback)
     // ==============================
