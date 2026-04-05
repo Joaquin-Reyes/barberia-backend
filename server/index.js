@@ -27,7 +27,6 @@ const VERIFY_TOKEN = "mi_token_secreto";
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 
-const BARBERIA_ID_DEFAULT = "c27e3c08-c82a-4226-a334-8b86167a2c7d";
 
 // ==============================
 // SUPABASE
@@ -611,6 +610,29 @@ app.post("/webhook", async (req, res) => {
     const changes = entry?.changes?.[0];
     const value = changes?.value;
 
+    // 🔥 NUEVO — detectar barbería automáticamente
+const phoneNumberId = value?.metadata?.phone_number_id;
+
+if (!phoneNumberId) {
+  console.log("❌ No vino phone_number_id");
+  return;
+}
+
+const { data: barberia, error } = await supabase
+  .from("barberias")
+  .select("*")
+  .eq("phone_number_id", phoneNumberId)
+  .single();
+
+if (error || !barberia) {
+  console.log("❌ Barbería no encontrada:", phoneNumberId);
+  return;
+}
+
+const barberia_id = barberia.id;
+
+console.log("✅ Barbería detectada:", barberia.nombre);
+
     if (!value?.messages || value.messages.length === 0) return;
 
     const message = value.messages[0];
@@ -662,7 +684,7 @@ app.post("/webhook", async (req, res) => {
       }
 
       if (mensaje === "2") {
-        const turnos = await obtenerTurnos(from, BARBERIA_ID_DEFAULT);
+        const turnos = await obtenerTurnos(from, barberia_id);
 
         if (!turnos || turnos.length === 0) {
           return await enviarMensaje(from, "📭 No tenés turnos agendados.");
@@ -678,7 +700,7 @@ app.post("/webhook", async (req, res) => {
       }
 
       if (mensaje === "3") {
-        const turnos = await obtenerTurnos(from);
+        const turnos = await obtenerTurnos(from, barberia_id);
 
         if (!turnos || turnos.length === 0) {
           return await enviarMensaje(from, "📭 No tenés turnos para cancelar.");
@@ -742,7 +764,7 @@ app.post("/webhook", async (req, res) => {
 
      const horarios = await obtenerHorariosDisponibles(
   usuario.barbero,
-  BARBERIA_ID_DEFAULT
+  barberia_id
 );
 
       if (horarios.length === 0) {
@@ -803,7 +825,7 @@ const disponible = await turnoDisponible(
   barbero: usuario.barbero,
   fecha: hoy,
   hora: usuario.horario,
-  barberia_id: BARBERIA_ID_DEFAULT
+  barberia_id: barberia_id
 });
 
         usuario.estado = "inicio";

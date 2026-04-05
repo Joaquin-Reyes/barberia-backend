@@ -9,9 +9,9 @@ export default function Login({ onLogin }) {
   const handleLogin = async () => {
     setError(null);
 
-    // 🔥 LOGIN REAL
+    // 🔐 LOGIN SUPABASE
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: usuario, // 👈 ahora es email
+      email: usuario,
       password: password,
     });
 
@@ -21,7 +21,11 @@ export default function Login({ onLogin }) {
       return;
     }
 
-    // 🔥 traer datos de tu tabla usuarios
+    // 🔥 GUARDAR TOKEN (CLAVE PARA EL BACKEND)
+    const token = data.session.access_token;
+    localStorage.setItem("token", token);
+
+    // 🔥 TRAER USUARIO DE TU DB
     const { data: usuarioDB, error: errorDB } = await supabase
       .from("usuarios")
       .select("*")
@@ -34,44 +38,28 @@ export default function Login({ onLogin }) {
       return;
     }
 
-    // 🔥 mandar user completo al sistema
-    // 🔥 verificar barbería activa
-const { data: barberia, error: errorBarberia } = await supabase
-  .from("barberias")
-  .select("*")
-  .eq("id", usuarioDB.barberia_id)
-  .single();
+    // 👑 SI ES SUPERADMIN → NO VALIDAR BARBERÍA
+    if (usuarioDB.rol !== "superadmin") {
+      const { data: barberia, error: errorBarberia } = await supabase
+        .from("barberias")
+        .select("*")
+        .eq("id", usuarioDB.barberia_id)
+        .single();
 
-if (errorBarberia) {
-  console.error(errorBarberia);
-  setError("Error verificando barbería");
-  return;
-}
+      if (errorBarberia) {
+        console.error(errorBarberia);
+        setError("Error verificando barbería");
+        return;
+      }
 
-// 🚨 BLOQUEO
-// 👑 SI ES SUPERADMIN → SALTEAR VALIDACIÓN
-if (usuarioDB.rol !== "superadmin") {
+      if (!barberia.activo) {
+        setError("Esta barbería está deshabilitada ❌");
+        return;
+      }
+    }
 
-  const { data: barberia, error: errorBarberia } = await supabase
-    .from("barberias")
-    .select("*")
-    .eq("id", usuarioDB.barberia_id)
-    .single();
-
-  if (errorBarberia) {
-    console.error(errorBarberia);
-    setError("Error verificando barbería");
-    return;
-  }
-
-  if (!barberia.activo) {
-    setError("Esta barbería está deshabilitada ❌");
-    return;
-  }
-}
-
-// ✅ LOGIN OK
-onLogin(usuarioDB);
+    // ✅ LOGIN OK
+    onLogin(usuarioDB);
   };
 
   return (

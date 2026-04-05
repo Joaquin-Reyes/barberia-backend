@@ -287,16 +287,19 @@ const mostrarToast = (mensaje, tipo = "success") => {
       }
 
       try {
-  const res = await fetch(`${API}/admin/crear-turno`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-  ...nuevo,
-  barberia_id: user.barberia_id
-}),
-  });
+const token = localStorage.getItem("token");
+console.log("TOKEN:", token);
+
+const res = await fetch(`${API}/admin/crear-turno`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`, // 🔥 ESTO FALTABA
+  },
+  body: JSON.stringify({
+    ...nuevo,
+  }),
+});
 
   const data = await res.json();
 
