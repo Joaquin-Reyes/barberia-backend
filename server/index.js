@@ -615,10 +615,7 @@ app.post("/webhook", async (req, res) => {
     // ==============================
     const phoneNumberId = value?.metadata?.phone_number_id;
 
-    if (!phoneNumberId) {
-      console.log("❌ No vino phone_number_id");
-      return;
-    }
+    if (!phoneNumberId) return;
 
     const { data: barberia, error } = await supabase
       .from("barberias")
@@ -626,10 +623,7 @@ app.post("/webhook", async (req, res) => {
       .eq("phone_number_id", phoneNumberId)
       .single();
 
-    if (error || !barberia) {
-      console.log("❌ Barbería no encontrada:", phoneNumberId);
-      return;
-    }
+    if (error || !barberia) return;
 
     const barberia_id = barberia.id;
 
@@ -641,7 +635,6 @@ app.post("/webhook", async (req, res) => {
     if (!value?.messages || value.messages.length === 0) return;
 
     const message = value.messages[0];
-
     if (!message.text) return;
 
     const messageId = message.id;
@@ -653,7 +646,7 @@ app.post("/webhook", async (req, res) => {
     const text = message.text.body;
 
     // ==============================
-    // 👤 CLIENTE (MULTI-BARBERÍA)
+    // 👤 CLIENTE
     // ==============================
     let { data: cliente } = await supabase
       .from("clientes")
@@ -679,7 +672,7 @@ app.post("/webhook", async (req, res) => {
     console.log("👤 Cliente:", cliente.telefono);
 
     // ==============================
-    // 🧠 ESTADO POR BARBERÍA
+    // 🧠 ESTADO
     // ==============================
     const userKey = `${from}_${barberia_id}`;
 
@@ -696,71 +689,66 @@ app.post("/webhook", async (req, res) => {
     const usuario = usuarios[userKey];
     const mensaje = text.toLowerCase();
 
-
     // ==============================
-// 🔥 INTENCIÓN: QUIERE TURNO
-// ==============================
-if (mensaje.includes("turno")) {
-  usuario.estado = "servicio";
+    // 🔥 INTENCIONES (ORDEN CORRECTO)
+    // ==============================
 
-  return await enviarMensaje(from, `🔥 Perfecto, vamos a agendar
+    // 🔹 VER TURNOS (PRIMERO)
+    if (
+      mensaje.includes("ver turnos") ||
+      mensaje.includes("mis turnos") ||
+      mensaje.includes("ver mis turnos")
+    ) {
+      const turnos = await obtenerTurnos(from, barberia_id);
+
+      if (!turnos || turnos.length === 0) {
+        return await enviarMensaje(from, "📭 No tenés turnos agendados.");
+      }
+
+      let texto = "📅 Tus turnos:\n\n";
+
+      turnos.forEach((t, i) => {
+        texto += `${i + 1}️⃣ ${t.fecha} - ${t.hora}\n💈 ${t.barbero}\n✂️ ${t.servicio}\n\n`;
+      });
+
+      return await enviarMensaje(from, texto);
+    }
+
+    // 🔹 CANCELAR (SEGUNDO)
+    if (mensaje.includes("cancelar")) {
+      const turnos = await obtenerTurnos(from, barberia_id);
+
+      if (!turnos || turnos.length === 0) {
+        return await enviarMensaje(from, "📭 No tenés turnos para cancelar.");
+      }
+
+      usuario.turnos = turnos;
+      usuario.estado = "cancelar";
+
+      let texto = "❌ Elegí el turno a cancelar:\n\n";
+
+      turnos.forEach((t, i) => {
+        texto += `${i + 1}️⃣ ${t.fecha} - ${t.hora}\n💈 ${t.barbero}\n\n`;
+      });
+
+      return await enviarMensaje(from, texto);
+    }
+
+    // 🔹 SACAR TURNO (ÚLTIMO)
+    if (mensaje.includes("turno")) {
+      usuario.estado = "servicio";
+
+      return await enviarMensaje(from, `🔥 Perfecto, vamos a agendar
 
 ¿Qué servicio querés?
 
 1️⃣ Corte
 2️⃣ Barba
 3️⃣ Corte + barba`);
-}
-
-
-// ==============================
-// 🔥 INTENCIÓN: VER TURNOS
-// ==============================
-if (
-  mensaje.includes("ver turnos") ||
-  mensaje.includes("mis turnos") ||
-  mensaje.includes("ver mis turnos")
-) {
-  const turnos = await obtenerTurnos(from, barberia_id);
-
-  if (!turnos || turnos.length === 0) {
-    return await enviarMensaje(from, "📭 No tenés turnos agendados.");
-  }
-
-  let texto = "📅 Tus turnos:\n\n";
-
-  turnos.forEach((t, i) => {
-    texto += `${i + 1}️⃣ ${t.fecha} - ${t.hora}\n💈 ${t.barbero}\n✂️ ${t.servicio}\n\n`;
-  });
-
-  return await enviarMensaje(from, texto);
-}
-
-
-// ==============================
-// 🔥 INTENCIÓN: CANCELAR TURNO
-// ==============================
-if (mensaje.includes("cancelar")) {
-  const turnos = await obtenerTurnos(from, barberia_id);
-
-  if (!turnos || turnos.length === 0) {
-    return await enviarMensaje(from, "📭 No tenés turnos para cancelar.");
-  }
-
-  usuario.turnos = turnos;
-  usuario.estado = "cancelar";
-
-  let texto = "❌ Elegí el turno a cancelar:\n\n";
-
-  turnos.forEach((t, i) => {
-    texto += `${i + 1}️⃣ ${t.fecha} - ${t.hora}\n💈 ${t.barbero}\n\n`;
-  });
-
-  return await enviarMensaje(from, texto);
-}
+    }
 
     // ==============================
-    // 🤖 FLUJO BOT
+    // 🤖 FLUJO BOT (fallback)
     // ==============================
 
     if (usuario.estado === "inicio") {
@@ -778,7 +766,6 @@ if (mensaje.includes("cancelar")) {
     if (usuario.estado === "menu") {
       if (mensaje === "1") {
         usuario.estado = "servicio";
-
         return await enviarMensaje(from, `✂️ ¿Qué te hacemos hoy?
 
 1️⃣ Corte
@@ -832,16 +819,16 @@ if (mensaje.includes("cancelar")) {
       }
 
       const turno = usuario.turnos[index];
-
       const ok = await eliminarTurno(turno.id);
 
       usuario.estado = "inicio";
 
-      if (ok) {
-        return await enviarMensaje(from, "✅ Turno cancelado correctamente");
-      } else {
-        return await enviarMensaje(from, "❌ Error al cancelar el turno");
-      }
+      return await enviarMensaje(
+        from,
+        ok
+          ? "✅ Turno cancelado correctamente"
+          : "❌ Error al cancelar el turno"
+      );
     }
 
     if (usuario.estado === "servicio") {
@@ -878,11 +865,7 @@ if (mensaje.includes("cancelar")) {
       usuario.estado = "horario";
 
       let texto = "⏰ Horarios disponibles:\n\n";
-
-      horarios.forEach(h => {
-        texto += `• ${h}\n`;
-      });
-
+      horarios.forEach(h => (texto += `• ${h}\n`));
       texto += "\nEscribí el horario que querés 👇";
 
       return await enviarMensaje(from, texto);
@@ -916,7 +899,7 @@ Confirmamos?
 
         if (!disponible) {
           usuario.estado = "horario";
-          return await enviarMensaje(from, "⚠️ Ese horario ya está ocupado. Elegí otro.");
+          return await enviarMensaje(from, "⚠️ Ese horario ya está ocupado.");
         }
 
         const ok = await guardarTurno({
@@ -926,7 +909,7 @@ Confirmamos?
           barbero: usuario.barbero,
           fecha: hoy,
           hora: usuario.horario,
-          barberia_id: barberia_id
+          barberia_id
         });
 
         usuario.estado = "inicio";
@@ -939,11 +922,9 @@ Confirmamos?
             barbero: usuario.barbero,
             fecha: hoy,
             hora: usuario.horario,
-            barberia_id: barberia_id
+            barberia_id
           });
-        }
 
-        if (ok) {
           return await enviarMensaje(from, `🔥 Turno confirmado
 
 📅 ${hoy}
@@ -951,17 +932,14 @@ Confirmamos?
 💈 ${usuario.barbero}
 
 Te esperamos!`);
-        } else {
-          return await enviarMensaje(from, "❌ Error al guardar turno");
         }
+
+        return await enviarMensaje(from, "❌ Error al guardar turno");
       }
 
       if (mensaje === "2") {
         usuario.estado = "inicio";
-
-        return await enviarMensaje(from, `❌ Turno cancelado
-
-Cuando quieras, escribime 👍`);
+        return await enviarMensaje(from, "❌ Turno cancelado");
       }
 
       return await enviarMensaje(from, "Respondé 1 o 2");
@@ -971,7 +949,6 @@ Cuando quieras, escribime 👍`);
     console.error("❌ Error en webhook:", error.message);
   }
 });
-
 // ==============================
 // MENSAJES
 // ==============================
