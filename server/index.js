@@ -695,6 +695,22 @@ app.post("/webhook", async (req, res) => {
 
     const usuario = usuarios[userKey];
     const mensaje = text.toLowerCase();
+    
+
+    // ==============================
+// 🔥 INTENCIÓN: QUIERE TURNO
+// ==============================
+if (mensaje.includes("turno")) {
+  usuario.estado = "servicio";
+
+  return await enviarMensaje(from, `🔥 Perfecto, vamos a agendar
+
+¿Qué servicio querés?
+
+1️⃣ Corte
+2️⃣ Barba
+3️⃣ Corte + barba`);
+}
 
     // ==============================
     // 🤖 FLUJO BOT
