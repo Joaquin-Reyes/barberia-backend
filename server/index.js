@@ -695,7 +695,7 @@ app.post("/webhook", async (req, res) => {
 
     const usuario = usuarios[userKey];
     const mensaje = text.toLowerCase();
-    
+
 
     // ==============================
 // 🔥 INTENCIÓN: QUIERE TURNO
@@ -710,6 +710,53 @@ if (mensaje.includes("turno")) {
 1️⃣ Corte
 2️⃣ Barba
 3️⃣ Corte + barba`);
+}
+
+
+// ==============================
+// 🔥 INTENCIÓN: VER TURNOS
+// ==============================
+if (
+  mensaje.includes("ver turnos") ||
+  mensaje.includes("mis turnos") ||
+  mensaje.includes("ver mis turnos")
+) {
+  const turnos = await obtenerTurnos(from, barberia_id);
+
+  if (!turnos || turnos.length === 0) {
+    return await enviarMensaje(from, "📭 No tenés turnos agendados.");
+  }
+
+  let texto = "📅 Tus turnos:\n\n";
+
+  turnos.forEach((t, i) => {
+    texto += `${i + 1}️⃣ ${t.fecha} - ${t.hora}\n💈 ${t.barbero}\n✂️ ${t.servicio}\n\n`;
+  });
+
+  return await enviarMensaje(from, texto);
+}
+
+
+// ==============================
+// 🔥 INTENCIÓN: CANCELAR TURNO
+// ==============================
+if (mensaje.includes("cancelar")) {
+  const turnos = await obtenerTurnos(from, barberia_id);
+
+  if (!turnos || turnos.length === 0) {
+    return await enviarMensaje(from, "📭 No tenés turnos para cancelar.");
+  }
+
+  usuario.turnos = turnos;
+  usuario.estado = "cancelar";
+
+  let texto = "❌ Elegí el turno a cancelar:\n\n";
+
+  turnos.forEach((t, i) => {
+    texto += `${i + 1}️⃣ ${t.fecha} - ${t.hora}\n💈 ${t.barbero}\n\n`;
+  });
+
+  return await enviarMensaje(from, texto);
 }
 
     // ==============================
