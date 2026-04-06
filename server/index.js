@@ -427,9 +427,9 @@ const { error: errorInsert } = await supabase.from("turnos").insert([{
 
 // 👑 SUPERADMIN - CREAR BARBERÍA + ADMIN
 app.post("/superadmin/crear-barberia", async (req, res) => {
-  const { nombre, email} = req.body;
+  const { nombre, email, password} = req.body;
 
-  if (!nombre || !email) {
+  if (!nombre || !email || !password ) {
     return res.status(400).json({ error: "Faltan datos" });
   }
 
