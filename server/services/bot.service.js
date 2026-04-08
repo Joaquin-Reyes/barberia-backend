@@ -321,7 +321,9 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
   const matchHoraCompleta = mensaje.match(/\b(\d{1,2}:\d{2})\s*h(oras?|s)?\b/i) ||
                             mensaje.match(/\b(\d{1,2}:\d{2})\b/);
   const matchHoraSufijo = mensaje.match(/\b(\d{1,2})\s*h(oras?|s)?\b/i);
-  const matchHoraSola = !fechaDetectada && mensaje.match(/^\s*(\d{1,2})\s*$/);
+  // No interpretar números solos como hora cuando el estado usa números como selección de menú
+  const estadosNumericos = ["menu", "servicio", "barbero", "cancelar", "cancelar_confirmacion", "confirmacion"];
+  const matchHoraSola = !fechaDetectada && !estadosNumericos.includes(usuario.estado) && mensaje.match(/^\s*(\d{1,2})\s*$/);
 
   const horaRaw = matchHoraCompleta?.[0] || matchHoraSufijo?.[0] || matchHoraSola?.[0] || null;
   const horaDetectada = horaRaw ? normalizarHora(horaRaw) : null;
