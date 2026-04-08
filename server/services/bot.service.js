@@ -92,6 +92,7 @@ async function pedirServicio(from, barberia_id, usuario) {
     : ["Corte", "Barba", "Corte + barba"];
 
   usuario.serviciosList = lista;
+  usuario.serviciosData = servicios;
 
   const emojis = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣"];
   let texto = "✂️ ¿Qué servicio querés?\n\n";
@@ -159,11 +160,13 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
     usuarios[userKey] = {
       estado: "inicio",
       servicio: null,
+      precio: 0,
       barbero: null,
       fecha: null,
       horario: null,
       turnos: null,
       serviciosList: null,
+      serviciosData: null,
       barberosList: null
     };
   }
@@ -327,10 +330,12 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
 
   if (usuario.estado === "servicio") {
     const lista = usuario.serviciosList || [];
+    const data = usuario.serviciosData || [];
     const num = parseInt(mensaje);
 
     if (num >= 1 && num <= lista.length) {
       usuario.servicio = lista[num - 1];
+      usuario.precio = data[num - 1]?.precio || 0;
     } else {
       return await enviarMensaje(from, `Elegí un número del 1 al ${lista.length}`);
     }
@@ -407,6 +412,7 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
         nombre: cliente.nombre,
         telefono: cliente.telefono,
         servicio: usuario.servicio,
+        precio: usuario.precio || 0,
         barbero: usuario.barbero,
         fecha: usuario.fecha,
         hora: usuario.horario,
