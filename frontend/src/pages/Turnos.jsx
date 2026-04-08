@@ -94,8 +94,7 @@ export default function Turnos({ user, onLogout }) {
     const h2 = typeof fin === "number" ? fin : parseInt(fin);
     if (isNaN(h1) || isNaN(h2)) return horas;
     for (let h = h1; h < h2; h++) {
-      horas.push(`${h}:00`);
-      horas.push(`${h}:30`);
+      horas.push(`${String(h).padStart(2, "0")}:00`);
     }
     return horas;
   };
@@ -105,8 +104,10 @@ export default function Turnos({ user, onLogout }) {
     setHorarios([]);
   };
 
+  const normHora = (h) => String(h || "").slice(0, 5).replace(/^(\d):/, "0$1:");
+
   const horariosDisponibles = horarios.filter((h) =>
-    !turnos.some((t) => t.fecha === nuevo.fecha && t.barbero === nuevo.barbero && t.hora === h)
+    !turnos.some((t) => t.fecha === nuevo.fecha && t.barbero === nuevo.barbero && normHora(t.hora) === h)
   );
 
   async function cambiarEstado(id, nuevoEstado) {
