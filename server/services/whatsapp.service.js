@@ -30,8 +30,6 @@ async function enviarMensaje(numero, mensaje, phone_number_id) {
 }
 
 async function notificarBarbero(datos) {
-  let telefono = datos.telefono;
-
   console.log("🔔 NOTIFICANDO BARBERO...");
 
   const { data: barberia } = await supabase
@@ -47,14 +45,13 @@ async function notificarBarbero(datos) {
     return;
   }
 
-  if (!telefono) {
-    const { data: barberoData } = await supabase
-      .from("barberos")
-      .select("telefono")
-      .ilike("nombre", datos.barbero);
+  const { data: barberoData } = await supabase
+    .from("barberos")
+    .select("telefono")
+    .ilike("nombre", datos.barbero)
+    .eq("barberia_id", datos.barberia_id);
 
-    telefono = barberoData?.[0]?.telefono;
-  }
+  const telefono = barberoData?.[0]?.telefono;
 
   if (!telefono) {
     console.log("⚠️ No hay número para el barbero:", datos.barbero);

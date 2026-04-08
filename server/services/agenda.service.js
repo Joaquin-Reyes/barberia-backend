@@ -177,6 +177,20 @@ async function enviarRecordatorios() {
     return;
   }
 
+  // Cache de phone_number_id por barberia_id para no repetir queries
+  const phoneNumberIdCache = {};
+
+  async function getPhoneNumberId(barberia_id) {
+    if (phoneNumberIdCache[barberia_id]) return phoneNumberIdCache[barberia_id];
+    const { data: barberia } = await supabase
+      .from("barberias")
+      .select("phone_number_id")
+      .eq("id", barberia_id)
+      .single();
+    phoneNumberIdCache[barberia_id] = barberia?.phone_number_id || null;
+    return phoneNumberIdCache[barberia_id];
+  }
+
   for (const turno of data) {
     const fechaTurno = new Date(`${turno.fecha}T${turno.hora}`);
     const diferencia = fechaTurno - ahora;
@@ -186,16 +200,22 @@ async function enviarRecordatorios() {
       diferencia < 25 * 60 * 60 * 1000 &&
       !turno.recordatorio_24h
     ) {
-      await enviarMensaje(
-        turno.telefono,
-        `⏰ Recordatorio de turno (mañana)
+      const phone_number_id = await getPhoneNumberId(turno.barberia_id);
+      if (!phone_number_id) {
+        console.log("⚠️ Sin phone_number_id para barberia:", turno.barberia_id);
+      } else {
+        await enviarMensaje(
+          turno.telefono,
+          `⏰ Recordatorio de turno (mañana)
 
 📅 ${turno.fecha}
 ⏰ ${turno.hora}
 💈 ${turno.barbero}
 
-Te esperamos! 🔥`
-      );
+Te esperamos! 🔥`,
+          phone_number_id
+        );
+      }
 
       await supabase
         .from("turnos")
@@ -205,19 +225,25 @@ Te esperamos! 🔥`
 
     if (
       diferencia > 2 * 60 * 60 * 1000 &&
-      diferencia < 3 * 60 * 60 * 1000 &&
+      diferencia < 4 * 60 * 60 * 1000 &&
       !turno.recordatorio_3h
     ) {
-      await enviarMensaje(
-        turno.telefono,
-        `🔥 Tu turno es en pocas horas
+      const phone_number_id = await getPhoneNumberId(turno.barberia_id);
+      if (!phone_number_id) {
+        console.log("⚠️ Sin phone_number_id para barberia:", turno.barberia_id);
+      } else {
+        await enviarMensaje(
+          turno.telefono,
+          `🔥 Tu turno es en pocas horas
 
 📅 ${turno.fecha}
 ⏰ ${turno.hora}
 💈 ${turno.barbero}
 
-¡No te lo olvides! 💈`
-      );
+¡No te lo olvides! 💈`,
+          phone_number_id
+        );
+      }
 
       await supabase
         .from("turnos")
