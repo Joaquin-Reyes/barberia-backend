@@ -160,12 +160,7 @@ async function pedirBarbero(from, barberia_id, usuario) {
 }
 
 async function pedirFecha(from) {
-  return await enviarMensaje(from, `📅 ¿Para qué fecha querés el turno?
-
-Podés escribir:
-• *mañana*
-• *el lunes*, *el viernes*
-• *15/04*`);
+  return await enviarMensaje(from, `📅 ¿Para qué fecha querés el turno?`);
 }
 
 async function mostrarHorarios(from, usuario, barberia_id) {
