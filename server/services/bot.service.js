@@ -81,9 +81,50 @@ function parsearFecha(texto) {
   return null;
 }
 
+// Normaliza cualquier formato de hora a "HH:MM"
+// Acepta: "12:00", "12hs", "12h", "12", "14:30hs", "9"
+function normalizarHora(texto) {
+  const t = String(texto).trim().replace(/\s*h(oras?|s)?\s*$/i, "").trim();
+
+  // Formato HH:MM
+  const matchCompleto = t.match(/^(\d{1,2}):(\d{2})$/);
+  if (matchCompleto) {
+    const h = parseInt(matchCompleto[1]);
+    const m = parseInt(matchCompleto[2]);
+    if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    }
+  }
+
+  // Solo número
+  const matchSolo = t.match(/^(\d{1,2})$/);
+  if (matchSolo) {
+    const h = parseInt(matchSolo[1]);
+    if (h >= 0 && h <= 23) {
+      return `${String(h).padStart(2, "0")}:00`;
+    }
+  }
+
+  return null;
+}
+
 // ==============================
 // MENSAJES REUTILIZABLES
 // ==============================
+
+async function mostrarMenu(from, barberia, clienteNombre) {
+  const saludo = clienteNombre
+    ? `👋 Hola ${clienteNombre}! Bienvenido a ${barberia.nombre} 💈`
+    : `👋 Hola! Bienvenido a ${barberia.nombre} 💈`;
+
+  return await enviarMensaje(from, `${saludo}
+
+¿Qué querés hacer?
+
+1️⃣ Sacar turno
+2️⃣ Ver mis turnos
+3️⃣ Cancelar turno`);
+}
 
 async function pedirServicio(from, barberia_id, usuario) {
   const servicios = await obtenerServicios(barberia_id);
@@ -96,7 +137,10 @@ async function pedirServicio(from, barberia_id, usuario) {
 
   const emojis = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣"];
   let texto = "✂️ ¿Qué servicio querés?\n\n";
-  lista.forEach((s, i) => { texto += `${emojis[i] || `${i+1}.`} ${s}\n`; });
+  lista.forEach((s, i) => {
+    const precio = servicios[i]?.precio ? ` — $${servicios[i].precio}` : "";
+    texto += `${emojis[i] || `${i+1}.`} ${s}${precio}\n`;
+  });
 
   return await enviarMensaje(from, texto);
 }
@@ -136,17 +180,46 @@ async function mostrarHorarios(from, usuario, barberia_id) {
     usuario.estado = "fecha";
     return await enviarMensaje(
       from,
-      `❌ ${usuario.barbero} no tiene horarios disponibles el ${fechaLegible(usuario.fecha || "")}\n\n¿Qué otro día te viene bien?`
+      `❌ ${usuario.barbero} no tiene horarios disponibles para esa fecha.\n\n¿Qué otro día te viene bien?`
     );
   }
 
   usuario.estado = "horario";
+  usuario.horariosDisponibles = horarios;
 
-  let texto = `⏰ Horarios disponibles para el ${fechaLegible(usuario.fecha)}:\n\n`;
-  horarios.forEach(h => (texto += `• ${h}\n`));
+  // Separar mañana / tarde para mejor legibilidad
+  const manana = horarios.filter(h => parseInt(h.split(":")[0]) < 13);
+  const tarde = horarios.filter(h => parseInt(h.split(":")[0]) >= 13);
+
+  let texto = `⏰ Horarios disponibles para el ${fechaLegible(usuario.fecha)}:\n`;
+
+  if (manana.length) {
+    texto += `\n🌅 *Mañana*\n`;
+    manana.forEach(h => (texto += `• ${h}\n`));
+  }
+  if (tarde.length) {
+    texto += `\n🌆 *Tarde*\n`;
+    tarde.forEach(h => (texto += `• ${h}\n`));
+  }
+
   texto += "\nEscribí el horario que querés 👇";
 
   return await enviarMensaje(from, texto);
+}
+
+async function mostrarConfirmacion(from, usuario) {
+  const precioTexto = usuario.precio ? `\n💵 Precio: $${usuario.precio}` : "";
+  return await enviarMensaje(from, `📋 Resumen de tu turno:
+
+✂️ ${usuario.servicio}
+💈 ${usuario.barbero}
+📅 ${fechaLegible(usuario.fecha)}
+⏰ ${usuario.horario}${precioTexto}
+
+¿Confirmamos?
+
+1️⃣ Sí, confirmar
+2️⃣ No, cancelar`);
 }
 
 // ==============================
@@ -165,14 +238,16 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
       fecha: null,
       horario: null,
       turnos: null,
+      turnoACancelar: null,
       serviciosList: null,
       serviciosData: null,
-      barberosList: null
+      barberosList: null,
+      horariosDisponibles: null
     };
   }
 
   const usuario = usuarios[userKey];
-  const mensaje = text.toLowerCase();
+  const mensaje = text.toLowerCase().trim();
 
   // ==============================
   // INTENCIONES GLOBALES
@@ -196,7 +271,7 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
     return await enviarMensaje(from, texto);
   }
 
-  if (mensaje.includes("cancelar")) {
+  if (mensaje.includes("cancelar") && !["cancelar", "cancelar_confirmacion"].includes(usuario.estado)) {
     const turnos = await obtenerTurnos(from, barberia_id);
 
     if (!turnos || turnos.length === 0) {
@@ -206,31 +281,50 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
     usuario.turnos = turnos;
     usuario.estado = "cancelar";
 
-    let texto = "❌ Elegí el turno a cancelar:\n\n";
+    let texto = "🗑️ ¿Cuál turno querés cancelar?\n\n";
     turnos.forEach((t, i) => {
-      texto += `${i + 1}️⃣ ${fechaLegible(t.fecha)} - ${String(t.hora).slice(0,5)}\n💈 ${t.barbero}\n\n`;
+      texto += `${i + 1}️⃣ ${fechaLegible(t.fecha)} - ${String(t.hora).slice(0,5)}\n💈 ${t.barbero}\n✂️ ${t.servicio}\n\n`;
     });
     return await enviarMensaje(from, texto);
   }
 
-  if (mensaje.includes("turno") && !["cancelar", "horario", "fecha", "confirmacion"].includes(usuario.estado)) {
+  if (mensaje.includes("turno") && !["cancelar", "cancelar_confirmacion", "horario", "fecha", "confirmacion"].includes(usuario.estado)) {
     usuario.estado = "servicio";
     return await pedirServicio(from, barberia_id, usuario);
+  }
+
+  if (["hola", "buenas", "buen dia", "buen día", "buenas tardes", "buenas noches", "menu", "menú"].some(s => mensaje.includes(s))) {
+    usuario.estado = "menu";
+    return await mostrarMenu(from, barberia, cliente?.nombre);
   }
 
   // ==============================
   // DETECCIÓN INTELIGENTE
   // ==============================
 
+  // Detectar barbero dinámicamente de la lista real
   let barberoDetectado = null;
-  if (mensaje.includes("agus")) barberoDetectado = "Agus";
-  if (mensaje.includes("lucas")) barberoDetectado = "Lucas";
+  const listaBarberos = usuario.barberosList?.length
+    ? usuario.barberosList
+    : (await obtenerBarberosList(barberia_id)).map(b => b.nombre);
+
+  for (const nombre of listaBarberos) {
+    if (mensaje.includes(nombre.toLowerCase())) {
+      barberoDetectado = nombre;
+      break;
+    }
+  }
 
   const fechaDetectada = parsearFecha(text);
 
-  const matchHora = mensaje.match(/\b([0-1]?[0-9]|2[0-3]):([0-5][0-9])\b/) ||
-                    mensaje.match(/\b(2[0-3]|1[0-9]|[7-9])\b/);
-  const horaDetectada = matchHora ? matchHora[0] : null;
+  // Detectar hora: "12:00", "12hs", "12h", "12 hs", "14", etc.
+  const matchHoraCompleta = mensaje.match(/\b(\d{1,2}:\d{2})\s*h(oras?|s)?\b/i) ||
+                            mensaje.match(/\b(\d{1,2}:\d{2})\b/);
+  const matchHoraSufijo = mensaje.match(/\b(\d{1,2})\s*h(oras?|s)?\b/i);
+  const matchHoraSola = !fechaDetectada && mensaje.match(/^\s*(\d{1,2})\s*$/);
+
+  const horaRaw = matchHoraCompleta?.[0] || matchHoraSufijo?.[0] || matchHoraSola?.[0] || null;
+  const horaDetectada = horaRaw ? normalizarHora(horaRaw) : null;
 
   if (barberoDetectado || fechaDetectada || horaDetectada) {
     if (!usuario.servicio) usuario.servicio = "Corte";
@@ -250,18 +344,7 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
     if (horaDetectada) {
       usuario.horario = horaDetectada;
       usuario.estado = "confirmacion";
-
-      return await enviarMensaje(from, `🔥 Te propongo este turno:
-
-✂️ ${usuario.servicio}
-💈 ${usuario.barbero}
-📅 ${fechaLegible(usuario.fecha)}
-⏰ ${usuario.horario}
-
-¿Confirmamos?
-
-1️⃣ Sí
-2️⃣ No`);
+      return await mostrarConfirmacion(from, usuario);
     }
 
     return await mostrarHorarios(from, usuario, barberia_id);
@@ -273,13 +356,7 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
 
   if (usuario.estado === "inicio") {
     usuario.estado = "menu";
-    return await enviarMensaje(from, `👋 Hola! Bienvenido a ${barberia.nombre} 💈
-
-¿Qué querés hacer?
-
-1️⃣ Sacar turno
-2️⃣ Ver mis turnos
-3️⃣ Cancelar turno`);
+    return await mostrarMenu(from, barberia, cliente?.nombre);
   }
 
   if (usuario.estado === "menu") {
@@ -305,27 +382,51 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
       }
       usuario.turnos = turnos;
       usuario.estado = "cancelar";
-      let texto = "❌ Elegí el turno a cancelar:\n\n";
+      let texto = "🗑️ ¿Cuál turno querés cancelar?\n\n";
       turnos.forEach((t, i) => {
-        texto += `${i + 1}️⃣ ${fechaLegible(t.fecha)} - ${String(t.hora).slice(0,5)}\n💈 ${t.barbero}\n\n`;
+        texto += `${i + 1}️⃣ ${fechaLegible(t.fecha)} - ${String(t.hora).slice(0,5)}\n💈 ${t.barbero}\n✂️ ${t.servicio}\n\n`;
       });
       return await enviarMensaje(from, texto);
     }
-    return await enviarMensaje(from, "😅 Elegí una opción válida (1, 2 o 3)");
+    return await enviarMensaje(from, "😅 Elegí una opción válida:\n\n1️⃣ Sacar turno\n2️⃣ Ver mis turnos\n3️⃣ Cancelar turno");
   }
 
   if (usuario.estado === "cancelar") {
     const index = parseInt(mensaje) - 1;
-    if (!usuario.turnos || !usuario.turnos[index]) {
-      return await enviarMensaje(from, "❌ Opción inválida");
+    if (isNaN(index) || !usuario.turnos || !usuario.turnos[index]) {
+      return await enviarMensaje(from, "❌ Opción inválida. Elegí un número de la lista.");
     }
     const turno = usuario.turnos[index];
-    const ok = await eliminarTurno(turno.id);
-    usuario.estado = "inicio";
+    usuario.turnoACancelar = turno;
+    usuario.estado = "cancelar_confirmacion";
     return await enviarMensaje(
       from,
-      ok ? "✅ Turno cancelado correctamente" : "❌ Error al cancelar el turno"
+      `⚠️ ¿Seguro que querés cancelar este turno?
+
+📅 ${fechaLegible(turno.fecha)} - ${String(turno.hora).slice(0,5)}
+💈 ${turno.barbero}
+✂️ ${turno.servicio}
+
+1️⃣ Sí, cancelar
+2️⃣ No, volver`
     );
+  }
+
+  if (usuario.estado === "cancelar_confirmacion") {
+    if (mensaje === "1") {
+      const ok = await eliminarTurno(usuario.turnoACancelar.id);
+      usuario.estado = "menu";
+      if (ok) {
+        await enviarMensaje(from, "✅ Turno cancelado correctamente.");
+        return await mostrarMenu(from, barberia, cliente?.nombre);
+      }
+      return await enviarMensaje(from, "❌ Error al cancelar el turno. Intentá de nuevo.");
+    }
+    if (mensaje === "2") {
+      usuario.estado = "menu";
+      return await mostrarMenu(from, barberia, cliente?.nombre);
+    }
+    return await enviarMensaje(from, "Respondé *1* para confirmar o *2* para volver.");
   }
 
   if (usuario.estado === "servicio") {
@@ -359,12 +460,11 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
     }
 
     if (!barbero) {
-      return await enviarMensaje(from, "❌ No entendí. Elegí un número o escribí el nombre");
+      return await enviarMensaje(from, "❌ No entendí. Elegí un número o escribí el nombre.");
     }
 
     usuario.barbero = barbero;
     usuario.estado = "fecha";
-
     return await pedirFecha(from);
   }
 
@@ -383,20 +483,24 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
   }
 
   if (usuario.estado === "horario") {
-    usuario.horario = mensaje;
+    const horaIngresada = normalizarHora(text);
+    const disponibles = usuario.horariosDisponibles || [];
+
+    if (!horaIngresada) {
+      return await enviarMensaje(from, `❌ No entendí el horario. Escribí algo como *10:00* o *14hs*.`);
+    }
+
+    if (!disponibles.includes(horaIngresada)) {
+      const lista = disponibles.map(h => `• ${h}`).join("\n");
+      return await enviarMensaje(
+        from,
+        `❌ Ese horario no está disponible. Elegí uno de la lista:\n\n${lista}`
+      );
+    }
+
+    usuario.horario = horaIngresada;
     usuario.estado = "confirmacion";
-
-    return await enviarMensaje(from, `📅 Dale, te reservo esto:
-
-✂️ Servicio: ${usuario.servicio}
-💈 Barbero: ${usuario.barbero}
-📅 Fecha: ${fechaLegible(usuario.fecha)}
-⏰ Hora: ${usuario.horario}
-
-¿Confirmamos?
-
-1️⃣ Sí
-2️⃣ No`);
+    return await mostrarConfirmacion(from, usuario);
   }
 
   if (usuario.estado === "confirmacion") {
@@ -405,7 +509,8 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
 
       if (!disponible) {
         usuario.estado = "horario";
-        return await enviarMensaje(from, "⚠️ Ese horario ya fue tomado. ¿Elegís otro?");
+        const lista = (usuario.horariosDisponibles || []).map(h => `• ${h}`).join("\n");
+        return await enviarMensaje(from, `⚠️ Ese horario justo fue tomado. Elegí otro:\n\n${lista}`);
       }
 
       const ok = await guardarTurno({
@@ -419,8 +524,6 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
         barberia_id
       });
 
-      usuario.estado = "inicio";
-
       if (ok) {
         await notificarBarbero({
           nombre: cliente.nombre,
@@ -432,25 +535,33 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
           barberia_id
         });
 
-        return await enviarMensaje(from, `🔥 Turno confirmado
+        const precioTexto = usuario.precio ? `\n💵 $${usuario.precio}` : "";
+        usuario.estado = "inicio";
 
-📅 ${fechaLegible(usuario.fecha)}
-⏰ ${usuario.horario}
+        return await enviarMensaje(from, `🔥 ¡Turno confirmado!
+
+✂️ ${usuario.servicio}
 💈 ${usuario.barbero}
+📅 ${fechaLegible(usuario.fecha)}
+⏰ ${usuario.horario}${precioTexto}
 
-¡Te esperamos!`);
+¡Te esperamos! 💈`);
       }
 
-      return await enviarMensaje(from, "❌ Error al guardar turno");
+      usuario.estado = "inicio";
+      return await enviarMensaje(from, "❌ Error al guardar el turno. Intentá de nuevo.");
     }
 
     if (mensaje === "2") {
-      usuario.estado = "inicio";
-      return await enviarMensaje(from, "❌ Turno cancelado. ¿En qué te puedo ayudar?");
+      usuario.estado = "menu";
+      return await mostrarMenu(from, barberia, cliente?.nombre);
     }
 
-    return await enviarMensaje(from, "Respondé 1 o 2");
+    return await enviarMensaje(from, "Respondé *1* para confirmar o *2* para cancelar.");
   }
+
+  // Catch-all: mensaje no reconocido en cualquier estado
+  return await enviarMensaje(from, `No entendí ese mensaje. 😅\n\nEscribí *menu* para ver las opciones.`);
 }
 
 module.exports = { procesarMensaje };
