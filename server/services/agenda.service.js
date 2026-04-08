@@ -23,7 +23,7 @@ function generarSlots(hora_inicio, hora_fin) {
 
     const [h, m] = horaActual.split(":").map(Number);
     const d = new Date();
-    d.setHours(h, m + 30);
+    d.setHours(h, m + 60);
     horaActual = d.toTimeString().slice(0, 5);
   }
 
@@ -38,7 +38,7 @@ async function filtrarOcupados(slots, barberoNombre, barberia_id, fecha) {
     .eq("fecha", fecha)
     .eq("barberia_id", barberia_id);
 
-  const ocupados = (turnos || []).map(t => String(t.hora).slice(0, 5));
+  const ocupados = (turnos || []).map(t => formatearHora(t.hora));
   return slots.filter(h => !ocupados.includes(h));
 }
 
@@ -49,6 +49,7 @@ async function filtrarOcupados(slots, barberoNombre, barberia_id, fecha) {
 async function guardarTurno(turno) {
   const { error } = await supabase.from("turnos").insert([{
     ...turno,
+    hora: formatearHora(turno.hora),
     barberia_id: turno.barberia_id,
     recordatorio_24h: false,
     recordatorio_3h: false
@@ -152,7 +153,7 @@ async function turnoDisponible(fecha, hora, barbero) {
   const { data, error } = await supabase
     .from("turnos")
     .select("*")
-    .eq("hora", hora)
+    .eq("hora", formatearHora(hora))
     .eq("barbero", barbero)
     .eq("fecha", fecha);
 
@@ -272,6 +273,7 @@ async function obtenerBarberosList(barberia_id) {
 }
 
 module.exports = {
+  formatearHora,
   guardarTurno,
   obtenerHorariosDisponibles,
   eliminarTurno,

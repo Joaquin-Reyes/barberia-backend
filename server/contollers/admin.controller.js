@@ -1,5 +1,6 @@
 const { supabase } = require("../config/supabase");
 const { notificarBarbero } = require("../services/whatsapp.service");
+const { formatearHora } = require("../services/agenda.service");
 
 async function crearTurno(req, res) {
   const { nombre, telefono, servicio, precio, barbero, fecha, hora } = req.body;
@@ -8,6 +9,7 @@ async function crearTurno(req, res) {
   console.log("🧪 Barbero recibido desde panel:", barbero);
 
   const barberia_id = req.user.barberia_id;
+  const horaNormalizada = formatearHora(hora);
 
   if (!nombre || !telefono || !servicio || !barbero || !fecha || !hora) {
     return res.status(400).json({ error: "Faltan datos" });
@@ -17,7 +19,7 @@ async function crearTurno(req, res) {
     const { data: turnosExistentes, error: errorBusqueda } = await supabase
       .from("turnos")
       .select("*")
-      .eq("hora", hora)
+      .eq("hora", horaNormalizada)
       .eq("barbero", barbero)
       .eq("fecha", fecha);
 
@@ -37,7 +39,7 @@ async function crearTurno(req, res) {
       precio: precio || 0,
       barbero,
       fecha,
-      hora,
+      hora: horaNormalizada,
       barberia_id,
       recordatorio_24h: false,
       recordatorio_3h: false
