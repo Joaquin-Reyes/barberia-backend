@@ -227,11 +227,31 @@ Te esperamos! 🔥`
   }
 }
 
+async function obtenerServicios(barberia_id) {
+  const { data, error } = await supabase
+    .from("servicios")
+    .select("nombre, precio")
+    .eq("barberia_id", barberia_id);
+  if (error) return [];
+  return data || [];
+}
+
+async function obtenerBarberosList(barberia_id) {
+  const { data, error } = await supabase
+    .from("barberos")
+    .select("nombre")
+    .eq("barberia_id", barberia_id);
+  if (error) return [];
+  return data || [];
+}
+
 module.exports = {
   guardarTurno,
   obtenerHorariosDisponibles,
   eliminarTurno,
   obtenerTurnos,
   turnoDisponible,
-  enviarRecordatorios
+  enviarRecordatorios,
+  obtenerServicios,
+  obtenerBarberosList
 };

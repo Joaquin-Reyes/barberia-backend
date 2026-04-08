@@ -4,7 +4,9 @@ const {
   eliminarTurno,
   guardarTurno,
   obtenerHorariosDisponibles,
-  turnoDisponible
+  turnoDisponible,
+  obtenerServicios,
+  obtenerBarberosList
 } = require("./agenda.service");
 
 // Estado de conversación en memoria (por usuario+barbería)
@@ -83,20 +85,33 @@ function parsearFecha(texto) {
 // MENSAJES REUTILIZABLES
 // ==============================
 
-async function pedirServicio(from) {
-  return await enviarMensaje(from, `✂️ ¿Qué servicio querés?
+async function pedirServicio(from, barberia_id, usuario) {
+  const servicios = await obtenerServicios(barberia_id);
+  const lista = servicios.length
+    ? servicios.map(s => s.nombre)
+    : ["Corte", "Barba", "Corte + barba"];
 
-1️⃣ Corte
-2️⃣ Barba
-3️⃣ Corte + barba`);
+  usuario.serviciosList = lista;
+
+  const emojis = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣"];
+  let texto = "✂️ ¿Qué servicio querés?\n\n";
+  lista.forEach((s, i) => { texto += `${emojis[i] || `${i+1}.`} ${s}\n`; });
+
+  return await enviarMensaje(from, texto);
 }
 
-async function pedirBarbero(from) {
-  return await enviarMensaje(from, `💈 ¿Con quién querés atenderte?
+async function pedirBarbero(from, barberia_id, usuario) {
+  const barberos = await obtenerBarberosList(barberia_id);
+  const lista = barberos.map(b => b.nombre);
 
-1️⃣ Agus
-2️⃣ Lucas
-3️⃣ El que esté libre`);
+  usuario.barberosList = lista;
+
+  const emojis = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣"];
+  let texto = "💈 ¿Con quién querés atenderte?\n\n";
+  lista.forEach((b, i) => { texto += `${emojis[i] || `${i+1}.`} ${b}\n`; });
+  texto += `${emojis[lista.length] || `${lista.length+1}.`} El que esté libre`;
+
+  return await enviarMensaje(from, texto);
 }
 
 async function pedirFecha(from) {
@@ -147,7 +162,9 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
       barbero: null,
       fecha: null,
       horario: null,
-      turnos: null
+      turnos: null,
+      serviciosList: null,
+      barberosList: null
     };
   }
 
@@ -195,7 +212,7 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
 
   if (mensaje.includes("turno") && !["cancelar", "horario", "fecha", "confirmacion"].includes(usuario.estado)) {
     usuario.estado = "servicio";
-    return await pedirServicio(from);
+    return await pedirServicio(from, barberia_id, usuario);
   }
 
   // ==============================
@@ -219,7 +236,7 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
 
     if (!usuario.barbero) {
       usuario.estado = "barbero";
-      return await pedirBarbero(from);
+      return await pedirBarbero(from, barberia_id, usuario);
     }
 
     if (!usuario.fecha) {
@@ -265,7 +282,7 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
   if (usuario.estado === "menu") {
     if (mensaje === "1") {
       usuario.estado = "servicio";
-      return await pedirServicio(from);
+      return await pedirServicio(from, barberia_id, usuario);
     }
     if (mensaje === "2") {
       const turnos = await obtenerTurnos(from, barberia_id);
@@ -309,28 +326,35 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
   }
 
   if (usuario.estado === "servicio") {
-    if (mensaje === "1") usuario.servicio = "Corte";
-    else if (mensaje === "2") usuario.servicio = "Barba";
-    else if (mensaje === "3") usuario.servicio = "Corte + barba";
-    else return await enviarMensaje(from, "Elegí 1, 2 o 3");
+    const lista = usuario.serviciosList || [];
+    const num = parseInt(mensaje);
+
+    if (num >= 1 && num <= lista.length) {
+      usuario.servicio = lista[num - 1];
+    } else {
+      return await enviarMensaje(from, `Elegí un número del 1 al ${lista.length}`);
+    }
 
     usuario.estado = "barbero";
-    return await pedirBarbero(from);
+    return await pedirBarbero(from, barberia_id, usuario);
   }
 
-  // 🔥 BLOQUE ARREGLADO
   if (usuario.estado === "barbero") {
+    const lista = usuario.barberosList || [];
+    const num = parseInt(mensaje);
     let barbero = null;
 
-    if (mensaje === "1") barbero = "Agus";
-    else if (mensaje === "2") barbero = "Lucas";
-    else if (mensaje === "3") barbero = "Cualquiera";
-    else if (mensaje.includes("agus")) barbero = "Agus";
-    else if (mensaje.includes("lucas")) barbero = "Lucas";
-    else if (mensaje.includes("libre") || mensaje.includes("cualquiera")) barbero = "Cualquiera";
+    if (num >= 1 && num <= lista.length) {
+      barbero = lista[num - 1];
+    } else if (num === lista.length + 1 || mensaje.includes("libre") || mensaje.includes("cualquiera")) {
+      barbero = "Cualquiera";
+    } else {
+      const match = lista.find(b => mensaje.includes(b.toLowerCase()));
+      if (match) barbero = match;
+    }
 
     if (!barbero) {
-      return await enviarMensaje(from, "❌ No entendí. Elegí 1, 2, 3 o escribí el nombre");
+      return await enviarMensaje(from, "❌ No entendí. Elegí un número o escribí el nombre");
     }
 
     usuario.barbero = barbero;
