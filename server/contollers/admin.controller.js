@@ -1,4 +1,4 @@
-const { supabaseAdminAdmin } = require("../config/supabaseAdmin");
+const { supabaseAdmin } = require("../config/supabase");
 const { notificarBarbero } = require("../services/whatsapp.service");
 const { formatearHora } = require("../services/agenda.service");
 
