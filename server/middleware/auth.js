@@ -1,6 +1,6 @@
 const { createClient } = require("@supabase/supabase-js");
+const { supabaseAdmin } = require("../config/supabase");
 
-// 🔥 IMPORTANTE: usar mismas variables que tu index
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_KEY
@@ -25,7 +25,7 @@ async function authMiddleware(req, res, next) {
     }
 
     // 🔥 Buscar usuario en tu tabla usuarios
-    const { data: usuarioDB, error: dbError } = await supabase
+    const { data: usuarioDB, error: dbError } = await supabaseAdmin
       .from("usuarios")
       .select("*")
       .eq("id", user.id)
