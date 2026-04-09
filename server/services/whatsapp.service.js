@@ -1,5 +1,5 @@
 const axios = require("axios");
-const { supabase } = require("../config/supabase");
+const { supabaseAdmin } = require("../config/supabase");
 
 async function enviarMensaje(numero, mensaje, phone_number_id) {
   try {
@@ -32,7 +32,7 @@ async function enviarMensaje(numero, mensaje, phone_number_id) {
 async function notificarBarbero(datos) {
   console.log("🔔 NOTIFICANDO BARBERO...");
 
-  const { data: barberia } = await supabase
+  const { data: barberia } = await supabaseAdmin
     .from("barberias")
     .select("phone_number_id")
     .eq("id", datos.barberia_id)
@@ -45,7 +45,7 @@ async function notificarBarbero(datos) {
     return;
   }
 
-  const { data: barberoData } = await supabase
+  const { data: barberoData } = await supabaseAdmin
     .from("barberos")
     .select("telefono")
     .ilike("nombre", datos.barbero)

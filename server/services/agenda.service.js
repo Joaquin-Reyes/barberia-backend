@@ -1,4 +1,4 @@
-const { supabase } = require("../config/supabase");
+const { supabaseAdmin } = require("../config/supabase");
 const { enviarMensaje } = require("./whatsapp.service");
 
 // ==============================
@@ -31,7 +31,7 @@ function generarSlots(hora_inicio, hora_fin) {
 }
 
 async function filtrarOcupados(slots, barberoNombre, barberia_id, fecha) {
-  const { data: turnos } = await supabase
+  const { data: turnos } = await supabaseAdmin
     .from("turnos")
     .select("hora")
     .eq("barbero", barberoNombre)
@@ -47,7 +47,7 @@ async function filtrarOcupados(slots, barberoNombre, barberia_id, fecha) {
 // ==============================
 
 async function guardarTurno(turno) {
-  const { error } = await supabase.from("turnos").insert([{
+  const { error } = await supabaseAdmin.from("turnos").insert([{
     ...turno,
     hora: formatearHora(turno.hora),
     barberia_id: turno.barberia_id,
@@ -64,7 +64,7 @@ async function guardarTurno(turno) {
 
 async function obtenerHorariosDisponibles(barberoNombre, barberia_id, fecha) {
   // 1. Obtener ID del barbero por nombre
-  const { data: barberoData } = await supabase
+  const { data: barberoData } = await supabaseAdmin
     .from("barberos")
     .select("id")
     .ilike("nombre", barberoNombre)
@@ -79,7 +79,7 @@ async function obtenerHorariosDisponibles(barberoNombre, barberia_id, fecha) {
   const barbero_id = barberoData.id;
 
   // 2. Verificar excepción para esa fecha
-  const { data: excepcion } = await supabase
+  const { data: excepcion } = await supabaseAdmin
     .from("excepciones_barbero")
     .select("*")
     .eq("barbero_id", barbero_id)
@@ -102,7 +102,7 @@ async function obtenerHorariosDisponibles(barberoNombre, barberia_id, fecha) {
   // Usar T12:00:00 para evitar problemas de timezone al calcular el día
   const diaSemana = new Date(`${fecha}T12:00:00`).getDay();
 
-  const { data: horario } = await supabase
+  const { data: horario } = await supabaseAdmin
     .from("horarios_barbero")
     .select("hora_inicio, hora_fin")
     .eq("barbero_id", barbero_id)
@@ -122,7 +122,7 @@ async function obtenerHorariosDisponibles(barberoNombre, barberia_id, fecha) {
 }
 
 async function eliminarTurno(id) {
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from("turnos")
     .delete()
     .eq("id", id);
@@ -135,7 +135,7 @@ async function eliminarTurno(id) {
 }
 
 async function obtenerTurnos(telefono, barberia_id) {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("turnos")
     .select("*")
     .eq("telefono", telefono)
@@ -150,7 +150,7 @@ async function obtenerTurnos(telefono, barberia_id) {
 }
 
 async function turnoDisponible(fecha, hora, barbero) {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("turnos")
     .select("*")
     .eq("hora", formatearHora(hora))
@@ -171,7 +171,7 @@ async function turnoDisponible(fecha, hora, barbero) {
 async function enviarRecordatorios() {
   const ahora = new Date();
 
-  const { data, error } = await supabase.from("turnos").select("*");
+  const { data, error } = await supabaseAdmin.from("turnos").select("*");
 
   if (error) {
     console.log("❌ Error recordatorios:", error);
@@ -183,7 +183,7 @@ async function enviarRecordatorios() {
 
   async function getPhoneNumberId(barberia_id) {
     if (phoneNumberIdCache[barberia_id]) return phoneNumberIdCache[barberia_id];
-    const { data: barberia } = await supabase
+    const { data: barberia } = await supabaseAdmin
       .from("barberias")
       .select("phone_number_id")
       .eq("id", barberia_id)
@@ -218,7 +218,7 @@ Te esperamos! 🔥`,
         );
       }
 
-      await supabase
+      await supabaseAdmin
         .from("turnos")
         .update({ recordatorio_24h: true })
         .eq("id", turno.id);
@@ -246,7 +246,7 @@ Te esperamos! 🔥`,
         );
       }
 
-      await supabase
+      await supabaseAdmin
         .from("turnos")
         .update({ recordatorio_3h: true })
         .eq("id", turno.id);
@@ -255,7 +255,7 @@ Te esperamos! 🔥`,
 }
 
 async function obtenerServicios(barberia_id) {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("servicios")
     .select("nombre, precio")
     .eq("barberia_id", barberia_id);
@@ -264,7 +264,7 @@ async function obtenerServicios(barberia_id) {
 }
 
 async function obtenerBarberosList(barberia_id) {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("barberos")
     .select("nombre")
     .eq("barberia_id", barberia_id);

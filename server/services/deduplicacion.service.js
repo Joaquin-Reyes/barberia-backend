@@ -1,7 +1,7 @@
-const { supabase } = require("../config/supabase");
+const { supabaseAdmin } = require("../config/supabase");
 
 async function mensajeYaProcesado(id) {
-  const { data } = await supabase
+  const { data } = await supabaseAdmin
     .from("mensajes_procesados")
     .select("id")
     .eq("id", id)
@@ -11,7 +11,7 @@ async function mensajeYaProcesado(id) {
 }
 
 async function guardarMensajeProcesado(id) {
-  await supabase.from("mensajes_procesados").insert([{ id }]);
+  await supabaseAdmin.from("mensajes_procesados").insert([{ id }]);
 }
 
 module.exports = { mensajeYaProcesado, guardarMensajeProcesado };

@@ -1,4 +1,4 @@
-const { supabase } = require("../config/supabase");
+const { supabaseAdmin } = require("../config/supabase");
 const { mensajeYaProcesado, guardarMensajeProcesado } = require("../services/deduplicacion.service");
 const { procesarMensaje } = require("../services/bot.service");
 
@@ -29,7 +29,7 @@ async function handleMessage(req, res) {
     const phoneNumberId = value?.metadata?.phone_number_id;
     if (!phoneNumberId) return;
 
-    const { data: barberia, error } = await supabase
+    const { data: barberia, error } = await supabaseAdmin
       .from("barberias")
       .select("*")
       .eq("phone_number_id", phoneNumberId)
@@ -55,7 +55,7 @@ async function handleMessage(req, res) {
     const text = message.text.body;
 
     // Obtener o crear cliente
-    let { data: cliente } = await supabase
+    let { data: cliente } = await supabaseAdmin
       .from("clientes")
       .select("*")
       .eq("telefono", from)
@@ -63,7 +63,7 @@ async function handleMessage(req, res) {
       .maybeSingle();
 
     if (!cliente) {
-      const { data: nuevoCliente } = await supabase
+      const { data: nuevoCliente } = await supabaseAdmin
         .from("clientes")
         .insert({ telefono: from, nombre: from, barberia_id })
         .select()
