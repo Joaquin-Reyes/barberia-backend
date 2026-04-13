@@ -24,6 +24,7 @@ export default function Turnos({ user, onLogout }) {
   });
   const [busqueda, setBusqueda] = useState("");
   const [filtroFecha, setFiltroFecha] = useState("");
+  const [editando, setEditando] = useState({ id: null, campo: null, valor: "" });
 
   useEffect(() => {
     if (!user) return;
@@ -133,6 +134,14 @@ export default function Turnos({ user, onLogout }) {
     t.nombre.toLowerCase().includes(busqueda.toLowerCase()) &&
     (filtroFecha ? t.fecha === filtroFecha : true)
   );
+
+  async function guardarEdicion() {
+    const { id, campo, valor } = editando;
+    if (!id || !campo) return;
+    await supabase.from("turnos").update({ [campo]: valor }).eq("id", id);
+    setEditando({ id: null, campo: null, valor: "" });
+    traerTurnos();
+  }
 
   const pendientes = turnos.filter(t => t.estado === "pendiente").length;
   const confirmados = turnos.filter(t => t.estado === "confirmado").length;
@@ -306,10 +315,71 @@ export default function Turnos({ user, onLogout }) {
               </thead>
               <tbody>
                 {turnosFiltrados.map((t) => (
-                  <tr key={t.id} style={{ backgroundColor: getRowColor(t.estado) }}>
-                    <td>{t.nombre}</td>
+                  <tr key={t.id} className="group" style={{ backgroundColor: getRowColor(t.estado) }}>
+                    <td>
+                      {editando.id === t.id && editando.campo === "nombre" ? (
+                        <input
+                          autoFocus
+                          value={editando.valor}
+                          onChange={(e) => setEditando({ ...editando, valor: e.target.value })}
+                          onBlur={guardarEdicion}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") guardarEdicion();
+                            if (e.key === "Escape") setEditando({ id: null, campo: null, valor: "" });
+                          }}
+                          style={{ width: "100%", padding: "4px 6px", fontSize: "14px" }}
+                        />
+                      ) : (
+                        <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          {t.nombre}
+                          <span
+                            className="opacity-0 group-hover:opacity-100"
+                            style={{ cursor: "pointer", fontSize: "12px", transition: "opacity 0.15s" }}
+                            onClick={() => setEditando({ id: t.id, campo: "nombre", valor: t.nombre })}
+                          >✏️</span>
+                        </span>
+                      )}
+                    </td>
                     <td>{t.telefono}</td>
-                    <td>{t.servicio}</td>
+                    <td>
+                      {editando.id === t.id && editando.campo === "servicio" ? (
+                        <select
+                          autoFocus
+                          defaultValue=""
+                          onBlur={() => setEditando({ id: null, campo: null, valor: "" })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") setEditando({ id: null, campo: null, valor: "" });
+                          }}
+                          onChange={async (e) => {
+                            const seleccionado = servicios.find(s => s.nombre === e.target.value);
+                            if (!seleccionado) return;
+                            await supabase.from("turnos").update({
+                              servicio: seleccionado.nombre,
+                              precio: seleccionado.precio,
+                            }).eq("id", t.id);
+                            setEditando({ id: null, campo: null, valor: "" });
+                            traerTurnos();
+                          }}
+                          style={{ width: "100%", padding: "4px 6px", fontSize: "14px" }}
+                        >
+                          <option value="" disabled>{t.servicio}</option>
+                          {servicios.map((s) => (
+                            <option key={s.id} value={s.nombre}>
+                              {s.nombre} — ${s.precio.toLocaleString("es-AR")}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          {t.servicio}
+                          <span
+                            className="opacity-0 group-hover:opacity-100"
+                            style={{ cursor: "pointer", fontSize: "12px", transition: "opacity 0.15s" }}
+                            onClick={() => setEditando({ id: t.id, campo: "servicio", valor: t.servicio })}
+                          >✏️</span>
+                        </span>
+                      )}
+                    </td>
                     <td>{t.barbero}</td>
                     <td>{t.fecha}</td>
                     <td>{t.hora}</td>

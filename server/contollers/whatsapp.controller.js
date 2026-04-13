@@ -63,13 +63,7 @@ async function handleMessage(req, res) {
       .maybeSingle();
 
     if (!cliente) {
-      const { data: nuevoCliente } = await supabaseAdmin
-        .from("clientes")
-        .insert({ telefono: from, nombre: from, barberia_id })
-        .select()
-        .single();
-
-      cliente = nuevoCliente;
+      cliente = { telefono: from, nombre: null, barberia_id };
     }
 
     console.log("👤 Cliente:", cliente.telefono);

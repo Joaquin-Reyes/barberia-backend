@@ -168,6 +168,36 @@ tr:hover {
 }
 
 /* ========================= */
+/* LAYOUT SIDEBAR / NAVBAR  */
+/* ========================= */
+
+.sidebar-desktop {
+  display: none;
+}
+
+.navbar-mobile {
+  display: flex;
+}
+
+.main-content {
+  padding-bottom: 4rem;
+}
+
+@media (min-width: 640px) {
+  .sidebar-desktop {
+    display: flex;
+  }
+
+  .navbar-mobile {
+    display: none;
+  }
+
+  .main-content {
+    padding-bottom: 0;
+  }
+}
+
+/* ========================= */
 /* 📱 RESPONSIVE MEJORAS */
 /* ========================= */
 

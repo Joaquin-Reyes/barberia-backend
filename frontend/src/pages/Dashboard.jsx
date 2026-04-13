@@ -13,7 +13,7 @@ function Dashboard({ user, onLogout }) {
     <div className="flex h-screen bg-gray-50">
 
       {/* Sidebar - solo desktop */}
-      <aside className="hidden md:flex w-52 bg-white border-r border-gray-200 flex-col shrink-0">
+      <aside className="sidebar-desktop w-52 bg-white border-r border-gray-200 flex-col shrink-0">
         <div className="px-4 py-5 border-b border-gray-200">
           <p className="font-semibold text-sm text-gray-900">BarberApp</p>
           <p className="text-xs text-gray-400 mt-0.5">Panel de gestión</p>
@@ -46,12 +46,12 @@ function Dashboard({ user, onLogout }) {
       </aside>
 
       {/* Contenido principal */}
-      <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
+      <main className="flex-1 overflow-y-auto main-content">
         <Outlet />
       </main>
 
       {/* Navbar inferior - solo mobile */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex md:hidden z-50">
+      <nav className="navbar-mobile fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
         {navItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}

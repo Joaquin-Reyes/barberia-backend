@@ -1,3 +1,4 @@
+const { supabaseAdmin } = require("../config/supabase");
 const { enviarMensaje, notificarBarbero } = require("./whatsapp.service");
 const {
   obtenerTurnos,
@@ -212,8 +213,10 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
   const userKey = `${from}_${barberia_id}`;
 
   if (!usuarios[userKey]) {
+    const nombreReal = cliente.nombre && cliente.nombre !== cliente.telefono ? cliente.nombre : null;
     usuarios[userKey] = {
       estado: "inicio",
+      nombreCliente: nombreReal,
       servicio: null,
       precio: 0,
       barbero: null,
@@ -230,6 +233,12 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
 
   const usuario = usuarios[userKey];
   const mensaje = text.toLowerCase().trim();
+
+  // Si el cliente no tiene nombre real, pedirlo antes de cualquier otra cosa
+  if (!usuario.nombreCliente && usuario.estado !== "nombre") {
+    usuario.estado = "nombre";
+    return await enviarMensaje(from, "¡Hola! ¿Cuál es tu nombre y apellido? 😊");
+  }
 
   // ==============================
   // INTENCIONES GLOBALES
@@ -277,7 +286,7 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
 
   if (["hola", "buenas", "buen dia", "buen día", "buenas tardes", "buenas noches", "menu", "menú"].some(s => mensaje.includes(s))) {
     usuario.estado = "menu";
-    return await mostrarMenu(from, barberia, cliente?.nombre);
+    return await mostrarMenu(from, barberia, usuario.nombreCliente);
   }
 
   // ==============================
@@ -338,9 +347,24 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
   // FLUJO POR ESTADOS
   // ==============================
 
+  if (usuario.estado === "nombre") {
+    const nombreIngresado = text.trim();
+    if (!nombreIngresado) {
+      return await enviarMensaje(from, "Por favor ingresá tu nombre y apellido. 😊");
+    }
+    if (cliente.id) {
+      await supabaseAdmin.from("clientes").update({ nombre: nombreIngresado }).eq("id", cliente.id);
+    } else {
+      await supabaseAdmin.from("clientes").insert({ telefono: from, nombre: nombreIngresado, barberia_id });
+    }
+    usuario.nombreCliente = nombreIngresado;
+    usuario.estado = "menu";
+    return await mostrarMenu(from, barberia, nombreIngresado);
+  }
+
   if (usuario.estado === "inicio") {
     usuario.estado = "menu";
-    return await mostrarMenu(from, barberia, cliente?.nombre);
+    return await mostrarMenu(from, barberia, usuario.nombreCliente);
   }
 
   if (usuario.estado === "menu") {
@@ -402,13 +426,13 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
       usuario.estado = "menu";
       if (ok) {
         await enviarMensaje(from, "✅ Turno cancelado correctamente.");
-        return await mostrarMenu(from, barberia, cliente?.nombre);
+        return await mostrarMenu(from, barberia, usuario.nombreCliente);
       }
       return await enviarMensaje(from, "❌ Error al cancelar el turno. Intentá de nuevo.");
     }
     if (mensaje === "2") {
       usuario.estado = "menu";
-      return await mostrarMenu(from, barberia, cliente?.nombre);
+      return await mostrarMenu(from, barberia, usuario.nombreCliente);
     }
     return await enviarMensaje(from, "Respondé *1* para confirmar o *2* para volver.");
   }
@@ -498,8 +522,8 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
       }
 
       const ok = await guardarTurno({
-        nombre: cliente.nombre,
-        telefono: cliente.telefono,
+        nombre: usuario.nombreCliente,
+        telefono: from,
         servicio: usuario.servicio,
         precio: usuario.precio || 0,
         barbero: usuario.barbero,
@@ -510,8 +534,8 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
 
       if (ok) {
         await notificarBarbero({
-          nombre: cliente.nombre,
-          telefono: cliente.telefono,
+          nombre: usuario.nombreCliente,
+          telefono: from,
           servicio: usuario.servicio,
           barbero: usuario.barbero,
           fecha: usuario.fecha,
@@ -538,7 +562,7 @@ async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
 
     if (mensaje === "2") {
       usuario.estado = "menu";
-      return await mostrarMenu(from, barberia, cliente?.nombre);
+      return await mostrarMenu(from, barberia, usuario.nombreCliente);
     }
 
     return await enviarMensaje(from, "Respondé *1* para confirmar o *2* para cancelar.");
