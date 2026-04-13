@@ -71,7 +71,7 @@ export default function Login({ onLogin }) {
           placeholder="Email"
           value={usuario}
           onChange={(e) => setUsuario(e.target.value)}
-          className="w-full mb-3 bg-neutral-800 p-2 rounded-xl"
+          className="w-full mb-3 bg-white p-2 rounded-xl text-gray-900 placeholder-gray-400"
         />
 
         <input
@@ -79,7 +79,7 @@ export default function Login({ onLogin }) {
           placeholder="Contraseña"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full mb-4 bg-neutral-800 p-2 rounded-xl"
+          className="w-full mb-4 bg-white p-2 rounded-xl text-gray-900 placeholder-gray-400"
         />
 
         {error && (

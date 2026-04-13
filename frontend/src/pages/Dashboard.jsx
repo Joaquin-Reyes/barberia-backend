@@ -1,70 +1,80 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { LayoutDashboard, Users, DollarSign, Settings, LogOut } from 'lucide-react'
 
 const navItems = [
-  { to: 'turnos', label: 'Turnos' },
-  { to: 'barberos', label: 'Barberos' },
-  { to: 'facturacion', label: 'Facturación' },
-  { to: 'configuracion', label: 'Configuración' },
+  { to: 'turnos', label: 'Turnos', icon: LayoutDashboard },
+  { to: 'barberos', label: 'Barberos', icon: Users },
+  { to: 'facturacion', label: 'Facturación', icon: DollarSign },
+  { to: 'configuracion', label: 'Configuración', icon: Settings },
 ]
 
 function Dashboard({ user, onLogout }) {
   return (
-    <div style={{ display: 'flex', height: '100vh', background: '#f5f7fb' }}>
-      <aside style={{
-        width: '200px',
-        background: '#ffffff',
-        borderRight: '1px solid #e5e7eb',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
-        <div style={{ padding: '20px 16px', borderBottom: '1px solid #e5e7eb' }}>
-          <p style={{ fontWeight: '600', fontSize: '14px', margin: 0 }}>BarberApp</p>
-          <p style={{ fontSize: '11px', color: '#9ca3af', margin: '2px 0 0' }}>Panel de gestión</p>
-        </div>
+    <div className="flex h-screen bg-gray-50">
 
-        <nav style={{ flex: 1, padding: '10px 8px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          {navItems.map(item => (
+      {/* Sidebar - solo desktop */}
+      <aside className="hidden md:flex w-52 bg-white border-r border-gray-200 flex-col shrink-0">
+        <div className="px-4 py-5 border-b border-gray-200">
+          <p className="font-semibold text-sm text-gray-900">BarberApp</p>
+          <p className="text-xs text-gray-400 mt-0.5">Panel de gestión</p>
+        </div>
+        <nav className="flex-1 px-2 py-3 flex flex-col gap-1">
+          {navItems.map(({ to, label, icon: Icon }) => (
             <NavLink
-              key={item.to}
-              to={item.to}
-              style={({ isActive }) => ({
-                display: 'block',
-                padding: '8px 12px',
-                borderRadius: '8px',
-                fontSize: '13px',
-                textDecoration: 'none',
-                fontWeight: isActive ? '500' : '400',
-                background: isActive ? '#f3f4f6' : 'transparent',
-                color: isActive ? '#111827' : '#6b7280',
-              })}
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isActive ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                }`
+              }
             >
-              {item.label}
+              <Icon size={16} />
+              {label}
             </NavLink>
           ))}
         </nav>
-
-        <div style={{ padding: '12px 16px', borderTop: '1px solid #e5e7eb' }}>
-          <p style={{ fontSize: '11px', color: '#9ca3af', margin: '0 0 6px' }}>{user?.email}</p>
+        <div className="px-4 py-3 border-t border-gray-200">
+          <p className="text-xs text-gray-400 mb-1.5 truncate">{user?.email}</p>
           <button
             onClick={onLogout}
-            style={{
-              background: 'transparent',
-              color: '#ef4444',
-              border: 'none',
-              padding: 0,
-              fontSize: '12px',
-              cursor: 'pointer',
-              fontWeight: '500',
-            }}
+            className="text-xs text-red-500 font-medium hover:text-red-600 transition-colors"
           >
             Cerrar sesión
           </button>
         </div>
       </aside>
 
-      <main style={{ flex: 1, overflowY: 'auto' }}>
+      {/* Contenido principal */}
+      <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
         <Outlet />
       </main>
+
+      {/* Navbar inferior - solo mobile */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex md:hidden z-50">
+        {navItems.map(({ to, label, icon: Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            className={({ isActive }) =>
+              `flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-xs font-medium transition-colors ${
+                isActive ? 'text-gray-900' : 'text-gray-400'
+              }`
+            }
+          >
+            <Icon size={20} />
+            {label}
+          </NavLink>
+        ))}
+        <button
+          onClick={onLogout}
+          className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-xs font-medium text-red-400 transition-colors"
+        >
+          <LogOut size={20} />
+          Salir
+        </button>
+      </nav>
+
     </div>
   )
 }

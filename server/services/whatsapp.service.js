@@ -66,6 +66,11 @@ async function notificarBarbero(datos) {
 📅 ${datos.fecha}`;
 
   console.log("📤 Enviando mensaje a:", telefono);
+  console.log("🔍 DEBUG notificarBarbero →", {
+    telefono_raw: telefono,
+    phone_number_id,
+    url: `https://graph.facebook.com/v18.0/${phone_number_id}/messages`
+  });
 
   await enviarMensaje(telefono, mensaje, phone_number_id);
 }
