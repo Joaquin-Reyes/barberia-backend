@@ -1,9 +1,10 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { LayoutDashboard, Users, DollarSign, Settings, LogOut } from 'lucide-react'
+import { LayoutDashboard, Users, DollarSign, Settings, LogOut, Clock } from 'lucide-react'
 
 const navItems = [
   { to: 'turnos', label: 'Turnos', icon: LayoutDashboard },
   { to: 'barberos', label: 'Barberos', icon: Users },
+  { to: 'cola', label: 'Cola', icon: Clock },
   { to: 'facturacion', label: 'Facturación', icon: DollarSign },
   { to: 'configuracion', label: 'Configuración', icon: Settings },
 ]

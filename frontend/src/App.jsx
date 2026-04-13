@@ -7,6 +7,7 @@ import Turnos from './pages/Turnos'
 import Barberos from './pages/Barberos'
 import Facturacion from './pages/Facturacion'
 import Configuracion from './pages/Configuracion'
+import Cola from './pages/Cola'
 import './styles.css'
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
           <Route path="barberos" element={<Barberos user={user} />} />
           <Route path="facturacion" element={<Facturacion user={user} />} />
           <Route path="configuracion" element={<Configuracion user={user} />} />
+          <Route path="cola" element={<Cola user={user} />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
