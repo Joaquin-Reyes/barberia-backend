@@ -14,7 +14,7 @@ const session = require("express-session");
 
 const authMiddleware = require("./middleware/auth");
 const { enviarRecordatorios } = require("./services/agenda.service");
-const { updateTurnoEstado } = require("./contollers/admin.controller");
+
 
 const authRoutes = require("./routes/auth.routes");
 const adminRoutes = require("./routes/admin.routes");
@@ -33,7 +33,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(session({
-  secret: "clave_super_secreta",
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: true,
 }));
@@ -49,7 +49,7 @@ app.get("/test", authMiddleware, (req, res) => {
 
 app.use("/", authRoutes);
 app.use("/admin", adminRoutes);
-app.put("/turnos/:id/estado", updateTurnoEstado);
+
 app.use("/superadmin", superadminRoutes);
 app.use("/webhook", whatsappRoutes);
 app.use("/cola", colaRoutes);

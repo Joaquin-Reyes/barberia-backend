@@ -2,7 +2,7 @@ const { supabaseAdmin } = require("../config/supabase");
 const { mensajeYaProcesado, guardarMensajeProcesado } = require("../services/deduplicacion.service");
 const { procesarMensaje } = require("../services/bot.service");
 
-const VERIFY_TOKEN = "mi_token_secreto";
+const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
 
 function verify(req, res) {
   const mode = req.query["hub.mode"];

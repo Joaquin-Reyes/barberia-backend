@@ -1,4 +1,4 @@
-const ADMIN_PASSWORD = "1234";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 function adminLogin(req, res) {
   console.log("BODY:", req.body);
