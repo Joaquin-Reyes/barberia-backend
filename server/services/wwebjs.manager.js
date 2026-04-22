@@ -79,9 +79,11 @@ function initClient(barberia_id) {
   });
 
   client.on('message', async (msg) => {
-    console.log(`[wwebjs] msg ts=${msg.timestamp} readyAt=${entry.readyAt} fromMe=${msg.fromMe} body="${msg.body}"`);
+    const msgTs = msg.timestamp ?? msg.t ?? null;
+    console.log(`[wwebjs] msg ts=${msgTs} readyAt=${entry.readyAt} fromMe=${msg.fromMe} from=${msg.from} body="${msg.body}"`);
     if (msg.fromMe || msg.isGroupMsg || msg.isStatus) return;
-    if (entry.readyAt && msg.timestamp < entry.readyAt) return;
+    if (msg.from?.endsWith('@g.us')) return;
+    if (entry.readyAt && msgTs !== null && msgTs < entry.readyAt) return;
     try {
       await handleIncomingMessage(barberia_id, msg);
     } catch (err) {
