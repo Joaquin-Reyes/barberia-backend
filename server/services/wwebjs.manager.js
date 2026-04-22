@@ -46,7 +46,7 @@ function initClient(barberia_id) {
     return null;
   }
 
-  const entry = { client, qr: null, status: 'initializing' };
+  const entry = { client, qr: null, status: 'initializing', readyAt: null };
   clients.set(barberia_id, entry);
 
   client.on('qr', (qr) => {
@@ -63,6 +63,7 @@ function initClient(barberia_id) {
   client.on('ready', () => {
     entry.status = 'authenticated';
     entry.qr = null;
+    entry.readyAt = Math.floor(Date.now() / 1000);
     console.log(`[wwebjs] Cliente listo para barberia ${barberia_id}`);
   });
 
@@ -79,6 +80,7 @@ function initClient(barberia_id) {
 
   client.on('message', async (msg) => {
     if (msg.fromMe || msg.isGroupMsg || msg.isStatus) return;
+    if (entry.readyAt && msg.timestamp < entry.readyAt) return;
     try {
       await handleIncomingMessage(barberia_id, msg);
     } catch (err) {
