@@ -1,5 +1,5 @@
 const { supabaseAdmin } = require("../config/supabase");
-const { enviarMensaje, notificarBarbero } = require("./whatsapp.service");
+const { enviarMensaje, notificarBarbero, asyncLocalStorage } = require("./whatsapp.service");
 const {
   obtenerTurnos,
   eliminarTurno,
@@ -210,6 +210,12 @@ async function mostrarConfirmacion(from, usuario) {
 // ==============================
 
 async function procesarMensaje({ from, text, cliente, barberia, barberia_id }) {
+  return asyncLocalStorage.run({ barberia_id, mode: barberia.whatsapp_mode || "cloud_api" }, () =>
+    _procesarMensajeInterno({ from, text, cliente, barberia, barberia_id })
+  );
+}
+
+async function _procesarMensajeInterno({ from, text, cliente, barberia, barberia_id }) {
   const userKey = `${from}_${barberia_id}`;
 
   if (!usuarios[userKey]) {

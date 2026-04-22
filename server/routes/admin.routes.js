@@ -8,7 +8,8 @@ const {
   actualizarEstadoTurno,
   eliminarTurno,
   crearBarbero,
-  listarBarberos
+  listarBarberos,
+  getWhatsappQR
 } = require("../contollers/admin.controller");
 
 // 🔐 Proteger panel barbero (antes de la protección general)
@@ -21,6 +22,7 @@ router.use("/barbero.html", (req, res, next) => {
 router.post("/crear-turno", authMiddleware, crearTurno);
 router.post("/barberos", authMiddleware, crearBarbero);
 router.get("/barberos", authMiddleware, listarBarberos);
+router.get("/whatsapp/qr", authMiddleware, getWhatsappQR);
 
 // 🔐 Proteger panel HTML (deja pasar las APIs)
 router.use("/", (req, res, next) => {

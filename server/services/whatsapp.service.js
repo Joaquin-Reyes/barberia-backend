@@ -1,7 +1,24 @@
 const axios = require("axios");
+const { AsyncLocalStorage } = require("async_hooks");
 const { supabaseAdmin } = require("../config/supabase");
 
+// Contexto por invocación: { barberia_id, mode }
+// Usado por enviarMensaje para saber qué transporte usar sin cambiar sus call sites.
+const asyncLocalStorage = new AsyncLocalStorage();
+
 async function enviarMensaje(numero, mensaje, phone_number_id) {
+  const ctx = asyncLocalStorage.getStore();
+
+  if (ctx?.mode === "wwebjs" && ctx?.barberia_id) {
+    const { getClient } = require("./wwebjs.manager");
+    const entry = getClient(ctx.barberia_id);
+    if (entry?.status === "authenticated") {
+      const chatId = numero.includes("@c.us") ? numero : `${numero}@c.us`;
+      await entry.client.sendMessage(chatId, mensaje);
+      return;
+    }
+  }
+
   try {
     console.log("📨 enviarMensaje llamado con:", numero);
 
@@ -32,6 +49,26 @@ async function enviarMensaje(numero, mensaje, phone_number_id) {
 async function notificarBarbero(datos) {
   console.log("🔔 NOTIFICANDO BARBERO...");
 
+  // Ruta wwebjs: si hay cliente activo para esta barbería, usarlo
+  const { getClient } = require("./wwebjs.manager");
+  const entry = getClient(datos.barberia_id);
+
+  if (entry?.status === "authenticated") {
+    const telefonoBarbero = await _obtenerTelefonoBarbero(datos);
+    if (!telefonoBarbero) return;
+
+    const [y, m, d] = String(datos.fecha).split("-");
+    const fechaFormateada = `${d}/${m}/${y}`;
+    const horaFormateada = String(datos.hora).slice(0, 5);
+
+    const msg = `💈 Nuevo turno!\n\nBarbero: ${datos.barbero}\nCliente: ${datos.nombre}\nFecha: ${fechaFormateada}\nHora: ${horaFormateada}\nServicio: ${datos.servicio}`;
+
+    await entry.client.sendMessage(`${telefonoBarbero}@c.us`, msg);
+    console.log("✅ Notificación wwebjs enviada al barbero:", datos.barbero);
+    return;
+  }
+
+  // Ruta Cloud API (plantilla)
   const { data: barberia } = await supabaseAdmin
     .from("barberias")
     .select("phone_number_id")
@@ -45,27 +82,18 @@ async function notificarBarbero(datos) {
     return;
   }
 
-  const { data: barberoData } = await supabaseAdmin
-    .from("barberos")
-    .select("telefono")
-    .ilike("nombre", datos.barbero)
-    .eq("barberia_id", datos.barberia_id);
+  const telefonoBarbero = datos.telefono || (await _obtenerTelefonoBarbero(datos));
 
-  const telefono = barberoData?.[0]?.telefono;
-
-  if (!telefono) {
+  if (!telefonoBarbero) {
     console.log("⚠️ No hay número para el barbero:", datos.barbero);
     return;
   }
 
-  // Convertir fecha de YYYY-MM-DD a DD/MM/YYYY
   const [y, m, d] = String(datos.fecha).split("-");
   const fechaFormateada = `${d}/${m}/${y}`;
-
-  // Hora en formato HH:mm
   const horaFormateada = String(datos.hora).slice(0, 5);
 
-  console.log("📤 Enviando plantilla a barbero:", telefono);
+  console.log("📤 Enviando plantilla a barbero:", telefonoBarbero);
 
   const url = `https://graph.facebook.com/v18.0/${phone_number_id}/messages`;
 
@@ -74,7 +102,7 @@ async function notificarBarbero(datos) {
       url,
       {
         messaging_product: "whatsapp",
-        to: telefono,
+        to: telefonoBarbero,
         type: "template",
         template: {
           name: "nuevo_turno_barbero_v2",
@@ -106,7 +134,28 @@ async function notificarBarbero(datos) {
   }
 }
 
-async function enviarTemplateConfirmacion({ telefono, servicio, barbero, fecha, horario, precio }) {
+async function _obtenerTelefonoBarbero(datos) {
+  if (datos.telefono) return datos.telefono;
+  const { data } = await supabaseAdmin
+    .from("barberos")
+    .select("telefono")
+    .ilike("nombre", datos.barbero)
+    .eq("barberia_id", datos.barberia_id);
+  return data?.[0]?.telefono || null;
+}
+
+async function enviarTemplateConfirmacion({ telefono, servicio, barbero, fecha, horario, precio, barberia_id }) {
+  // Ruta wwebjs
+  if (barberia_id) {
+    const { getClient } = require("./wwebjs.manager");
+    const entry = getClient(barberia_id);
+    if (entry?.status === "authenticated") {
+      const msg = `✅ ¡Turno confirmado!\n\n✂️ ${servicio}\n💈 ${barbero}\n📅 ${fecha}\n⏰ ${horario}\n💵 $${precio}`;
+      await entry.client.sendMessage(`${telefono}@c.us`, msg);
+      return;
+    }
+  }
+
   const url = `https://graph.facebook.com/v18.0/${process.env.PHONE_NUMBER_ID}/messages`;
 
   await axios.post(
@@ -141,4 +190,4 @@ async function enviarTemplateConfirmacion({ telefono, servicio, barbero, fecha, 
   );
 }
 
-module.exports = { enviarMensaje, notificarBarbero, enviarTemplateConfirmacion };
+module.exports = { enviarMensaje, notificarBarbero, enviarTemplateConfirmacion, asyncLocalStorage };

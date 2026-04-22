@@ -1,6 +1,8 @@
 const { supabaseAdmin } = require("../config/supabase");
 const { notificarBarbero, enviarTemplateConfirmacion } = require("../services/whatsapp.service");
 const { formatearHora } = require("../services/agenda.service");
+const QRCode = require("qrcode");
+const wwebjsManager = require("../services/wwebjs.manager");
 
 async function crearTurno(req, res) {
   const { nombre, telefono, servicio, precio, barbero, fecha, hora } = req.body;
@@ -84,7 +86,8 @@ async function crearTurno(req, res) {
           barbero,
           fecha: `${d}/${m}/${y}`,
           horario: String(horaNormalizada).slice(0, 5),
-          precio: precio || 0
+          precio: precio || 0,
+          barberia_id
         });
         console.log("✅ Template confirmacion enviado al cliente:", telefono);
       } catch (errTemplate) {
@@ -218,6 +221,37 @@ async function listarBarberos(req, res) {
   res.json(data);
 }
 
+async function getWhatsappQR(req, res) {
+  const barberia_id = req.user.barberia_id;
+
+  const { data: barberia } = await supabaseAdmin
+    .from("barberias")
+    .select("whatsapp_mode")
+    .eq("id", barberia_id)
+    .single();
+
+  if (!barberia || barberia.whatsapp_mode !== "wwebjs") {
+    return res.status(400).json({ error: "Esta barbería no usa whatsapp-web.js" });
+  }
+
+  let entry = wwebjsManager.getClient(barberia_id);
+
+  if (!entry) {
+    entry = wwebjsManager.initClient(barberia_id);
+  }
+
+  if (entry.status === "authenticated") {
+    return res.json({ status: "authenticated" });
+  }
+
+  if (entry.status === "qr_pending" && entry.qr) {
+    const qrBase64 = await QRCode.toDataURL(entry.qr);
+    return res.json({ status: "qr_pending", qr: qrBase64 });
+  }
+
+  return res.json({ status: entry.status });
+}
+
 module.exports = {
   crearTurno,
   listarTurnos,
@@ -225,5 +259,6 @@ module.exports = {
   eliminarTurno,
   updateTurnoEstado,
   crearBarbero,
-  listarBarberos
+  listarBarberos,
+  getWhatsappQR
 };

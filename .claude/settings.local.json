@@ -20,7 +20,13 @@
       "Read(//c/Users/Joaco/AppData/Local/Programs//**)",
       "Read(//c/Users/Joaco/AppData/Local//**)",
       "Bash(\"/c/Users/Joaco/AppData/Local/Microsoft/WindowsApps/python.exe\" --version)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(npm install *)",
+      "Bash(node -e \"require\\('whatsapp-web.js'\\); console.log\\('ok'\\)\")",
+      "Bash(node --check server/services/wwebjs.manager.js)",
+      "Bash(node --check server/services/whatsapp.service.js)",
+      "Bash(node --check server/services/bot.service.js)",
+      "Bash(node --check server/contollers/admin.controller.js)"
     ]
   }
 }
