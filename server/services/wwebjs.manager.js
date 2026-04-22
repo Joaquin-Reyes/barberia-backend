@@ -82,6 +82,7 @@ function initClient(barberia_id) {
     const msgTs = msg.timestamp ?? msg.t ?? null;
     console.log(`[wwebjs] msg ts=${msgTs} readyAt=${entry.readyAt} fromMe=${msg.fromMe} from=${msg.from} body="${msg.body}"`);
     if (msg.fromMe || msg.isGroupMsg || msg.isStatus) return;
+    if (msg.from === 'status@broadcast') return;
     if (msg.from?.endsWith('@g.us')) return;
     if (entry.readyAt && msgTs !== null && msgTs < entry.readyAt) return;
     try {
