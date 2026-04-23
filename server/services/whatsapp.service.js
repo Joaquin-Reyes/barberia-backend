@@ -57,6 +57,7 @@ async function enviarMensaje(numero, mensaje, phone_number_id) {
 }
 
 async function enviarTemplateConfirmacion({ telefono, nombre, servicio, barbero, fecha, horario, precio, barberia_id }) {
+  console.log(`[enviarTemplateConfirmacion] telefono="${telefono}" barberia_id="${barberia_id}"`);
   const mode = barberia_id ? await _obtenerModo(barberia_id) : "cloud_api";
 
   if (mode === "wwebjs") {
