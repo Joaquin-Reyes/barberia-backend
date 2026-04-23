@@ -78,20 +78,7 @@ function initClient(barberia_id) {
     console.log(`[wwebjs] Desconectado para barberia ${barberia_id}: ${reason}`);
   });
 
-  client.on('message', async (msg) => {
-    const msgTs = msg.timestamp ?? msg.t ?? null;
-    console.log(`[wwebjs] msg ts=${msgTs} readyAt=${entry.readyAt} fromMe=${msg.fromMe} from=${msg.from} body="${msg.body}"`);
-    if (msg.fromMe || msg.isGroupMsg || msg.isStatus) return;
-    if (msg.from === 'status@broadcast') return;
-    if (msg.from?.endsWith('@g.us')) return;
-    if (entry.readyAt && msgTs !== null && msgTs < entry.readyAt) return;
-    try {
-      await handleIncomingMessage(barberia_id, msg);
-    } catch (err) {
-      console.error(`[wwebjs] Error procesando mensaje de barberia ${barberia_id}:`, err.message);
-      console.error(err.stack);
-    }
-  });
+  // TODO: habilitar bot para wwebjs cuando se requiera
 
   client.initialize().catch((err) => {
     console.error(`[wwebjs] Error init barberia ${barberia_id}:`, err.message);
@@ -101,40 +88,6 @@ function initClient(barberia_id) {
   return entry;
 }
 
-async function handleIncomingMessage(barberia_id, msg) {
-  const { supabaseAdmin } = require('../config/supabase');
-  const { mensajeYaProcesado, guardarMensajeProcesado } = require('./deduplicacion.service');
-  const { procesarMensaje } = require('./bot.service');
-
-  const messageId = msg.id._serialized;
-
-  if (await mensajeYaProcesado(messageId)) return;
-  await guardarMensajeProcesado(messageId);
-
-  const from = msg.from.replace('@c.us', '');
-  const text = msg.body;
-
-  const { data: barberia } = await supabaseAdmin
-    .from('barberias')
-    .select('*')
-    .eq('id', barberia_id)
-    .single();
-
-  if (!barberia) return;
-
-  let { data: cliente } = await supabaseAdmin
-    .from('clientes')
-    .select('*')
-    .eq('telefono', from)
-    .eq('barberia_id', barberia_id)
-    .maybeSingle();
-
-  if (!cliente) {
-    cliente = { telefono: from, nombre: null, barberia_id };
-  }
-
-  await procesarMensaje({ from, text, cliente, barberia, barberia_id });
-}
 
 function getClient(barberia_id) {
   return clients.get(barberia_id) || null;
