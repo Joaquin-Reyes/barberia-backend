@@ -113,33 +113,52 @@ async function enviarTemplateConfirmacion({ telefono, nombre, servicio, barbero,
 }
 
 async function notificarBarbero(datos) {
-  console.log("🔔 NOTIFICANDO BARBERO...");
+  console.log(`[notificarBarbero] barbero="${datos.barbero}" telefono="${datos.telefono}" barberia_id="${datos.barberia_id}"`);
 
-  const { data: barberia } = await supabaseAdmin
-    .from("barberias")
-    .select("whatsapp_mode, phone_number_id")
-    .eq("id", datos.barberia_id)
-    .single();
+  let barberia, barberiaError;
+  try {
+    const result = await supabaseAdmin
+      .from("barberias")
+      .select("whatsapp_mode, phone_number_id")
+      .eq("id", datos.barberia_id)
+      .single();
+    barberia = result.data;
+    barberiaError = result.error;
+  } catch (err) {
+    console.error("[notificarBarbero] Error consultando barberia:", err.message);
+    return;
+  }
+
+  if (barberiaError) {
+    console.error("[notificarBarbero] Supabase error al obtener barberia:", barberiaError.message);
+  }
 
   const mode = barberia?.whatsapp_mode || "cloud_api";
+  console.log(`[notificarBarbero] modo detectado="${mode}" phone_number_id="${barberia?.phone_number_id}"`);
 
   if (mode === "wwebjs") {
-    const { getClient } = require("./wwebjs.manager");
-    const entry = getClient(datos.barberia_id);
-    if (entry?.status === "authenticated") {
-      const telefonoBarbero = await _obtenerTelefonoBarbero(datos);
-      if (!telefonoBarbero) {
-        console.warn("⚠️ No hay número para el barbero:", datos.barbero);
-        return;
+    try {
+      const { getClient } = require("./wwebjs.manager");
+      const entry = getClient(datos.barberia_id);
+      console.log(`[notificarBarbero] wwebjs entry.status="${entry?.status}"`);
+      if (entry?.status === "authenticated") {
+        const telefonoBarbero = await _obtenerTelefonoBarbero(datos);
+        console.log(`[notificarBarbero] telefonoBarbero resuelto="${telefonoBarbero}"`);
+        if (!telefonoBarbero) {
+          console.warn("[notificarBarbero] No hay número para el barbero:", datos.barbero);
+          return;
+        }
+        const [y, m, d] = String(datos.fecha).split("-");
+        const fechaFormateada = `${d}/${m}/${y}`;
+        const horaFormateada = String(datos.hora).slice(0, 5);
+        const msg = `Nuevo turno!\n\nBarbero: ${datos.barbero}\nCliente: ${datos.nombre}\nFecha: ${fechaFormateada}\nHora: ${horaFormateada}\nServicio: ${datos.servicio}`;
+        await entry.client.sendMessage(`${telefonoBarbero}@c.us`, msg);
+        console.log("✅ Notificación wwebjs enviada al barbero:", datos.barbero);
+      } else {
+        console.warn(`[notificarBarbero] Cliente no listo para barberia ${datos.barberia_id}, notificación no enviada`);
       }
-      const [y, m, d] = String(datos.fecha).split("-");
-      const fechaFormateada = `${d}/${m}/${y}`;
-      const horaFormateada = String(datos.hora).slice(0, 5);
-      const msg = `Nuevo turno!\n\nBarbero: ${datos.barbero}\nCliente: ${datos.nombre}\nFecha: ${fechaFormateada}\nHora: ${horaFormateada}\nServicio: ${datos.servicio}`;
-      await entry.client.sendMessage(`${telefonoBarbero}@c.us`, msg);
-      console.log("✅ Notificación wwebjs enviada al barbero:", datos.barbero);
-    } else {
-      console.warn(`[wwebjs] Cliente no listo para barberia ${datos.barberia_id}, notificación al barbero no enviada`);
+    } catch (err) {
+      console.error("[notificarBarbero] Error en rama wwebjs:", err.message, err.stack);
     }
     return;
   }
@@ -147,13 +166,21 @@ async function notificarBarbero(datos) {
   // cloud_api
   const phone_number_id = barberia?.phone_number_id;
   if (!phone_number_id) {
-    console.log("❌ Barbería sin WhatsApp configurado");
+    console.log("[notificarBarbero] Barbería sin phone_number_id configurado");
     return;
   }
 
-  const telefonoBarbero = datos.telefono || (await _obtenerTelefonoBarbero(datos));
+  let telefonoBarbero;
+  try {
+    telefonoBarbero = datos.telefono || (await _obtenerTelefonoBarbero(datos));
+    console.log(`[notificarBarbero] telefonoBarbero resuelto="${telefonoBarbero}"`);
+  } catch (err) {
+    console.error("[notificarBarbero] Error obteniendo teléfono del barbero:", err.message);
+    return;
+  }
+
   if (!telefonoBarbero) {
-    console.log("⚠️ No hay número para el barbero:", datos.barbero);
+    console.log("[notificarBarbero] No hay número para el barbero:", datos.barbero);
     return;
   }
 
@@ -161,9 +188,8 @@ async function notificarBarbero(datos) {
   const fechaFormateada = `${d}/${m}/${y}`;
   const horaFormateada = String(datos.hora).slice(0, 5);
 
-  console.log("📤 Enviando plantilla a barbero:", telefonoBarbero);
-
   const url = `https://graph.facebook.com/v18.0/${phone_number_id}/messages`;
+  console.log(`[notificarBarbero] Enviando template cloud_api a "${telefonoBarbero}" via phone_number_id="${phone_number_id}"`);
   try {
     await axios.post(
       url,
@@ -197,7 +223,10 @@ async function notificarBarbero(datos) {
     );
     console.log("✅ Plantilla enviada al barbero:", datos.barbero);
   } catch (error) {
-    console.error("❌ Error enviando plantilla al barbero:", error.response?.data || error.message);
+    console.error("[notificarBarbero] Error enviando template cloud_api:", error.response?.data || error.message);
+    if (error.response?.data) {
+      console.error("[notificarBarbero] Detalle Meta API:", JSON.stringify(error.response.data, null, 2));
+    }
   }
 }
 
