@@ -104,6 +104,9 @@ export default function Configuracion({ user }) {
         setWpStatus("qr_pending");
       } else {
         setWpStatus(data.status || "initializing");
+        if (!wpPollRef.current) {
+          wpPollRef.current = setInterval(consultarQR, 3000);
+        }
       }
     } catch {
       detenerPolling();
@@ -308,13 +311,7 @@ export default function Configuracion({ user }) {
 
             {wpStatus === "initializing" && (
               <p style={{ fontSize: 13, color: "#64748B", margin: 0 }}>
-                Iniciando cliente, intentá de nuevo en unos segundos.{" "}
-                <button
-                  onClick={conectarWhatsapp}
-                  style={{ background: "transparent", color: "#2563EB", border: "none", padding: 0, fontSize: 13, cursor: "pointer" }}
-                >
-                  Reintentar
-                </button>
+                Iniciando cliente WhatsApp, el QR aparecerá automáticamente…
               </p>
             )}
 

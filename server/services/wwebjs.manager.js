@@ -52,7 +52,7 @@ function initClient(barberia_id) {
   client.on('qr', (qr) => {
     entry.qr = qr;
     entry.status = 'qr_pending';
-    console.log(`[wwebjs] QR generado para barberia ${barberia_id}`);
+    console.log(`[wwebjs] QR generado para barberia ${barberia_id} | status=${entry.status} | qr_length=${entry.qr?.length ?? 0}`);
   });
 
   client.on('authenticated', () => {
