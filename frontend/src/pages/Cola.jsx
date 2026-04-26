@@ -26,7 +26,8 @@ export default function Cola({ user }) {
   // ==============================
 
   async function cargarCola() {
-    const token = localStorage.getItem("token");
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
     try {
       const res = await fetch(`${API}/cola/${user.barberia_id}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -84,7 +85,8 @@ export default function Cola({ user }) {
   // ==============================
 
   async function terminar(barbero_id) {
-    const token = localStorage.getItem("token");
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
     try {
       const res = await fetch(`${API}/cola/terminar/${barbero_id}`, {
         method: "POST",
@@ -111,7 +113,8 @@ export default function Cola({ user }) {
       return;
     }
     setAgregando(true);
-    const token = localStorage.getItem("token");
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
     try {
       const res = await fetch(`${API}/cola/agregar`, {
         method: "POST",

@@ -213,7 +213,8 @@ export default function Barberos({ user }) {
                     return;
                   }
                   try {
-                    const token = localStorage.getItem("token");
+                    const { data: { session } } = await supabase.auth.getSession();
+                    const token = session?.access_token;
                     const res = await fetch(`${API}/admin/barberos`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },

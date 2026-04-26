@@ -22,7 +22,8 @@ export default function PanelBarbero({ user }) {
   const [toast, setToast] = useState(null);
 
   async function cargarDatos() {
-    const token = localStorage.getItem("token");
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
     try {
       const [colaRes, turnosRes] = await Promise.all([
         fetch(`${API}/cola/${user.barberia_id}`, {
@@ -124,7 +125,8 @@ export default function PanelBarbero({ user }) {
   async function terminar() {
     if (!barberoId) return;
     setTerminando(true);
-    const token = localStorage.getItem("token");
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
     try {
       // Si el cliente actual es un turno reservado, marcarlo como completado
       if (proximoCliente?.tipo === "turno_reservado" && proximoCliente.turno_id) {

@@ -236,7 +236,8 @@ export default function Turnos({ user, onLogout }) {
                       return;
                     }
                     try {
-                      const token = localStorage.getItem("token");
+                      const { data: { session } } = await supabase.auth.getSession();
+                      const token = session?.access_token;
                       const res = await fetch(`${API}/admin/crear-turno`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
