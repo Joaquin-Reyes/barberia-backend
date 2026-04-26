@@ -128,7 +128,7 @@ export default function PanelBarbero({ user }) {
     try {
       // Si el cliente actual es un turno reservado, marcarlo como completado
       if (proximoCliente?.tipo === "turno_reservado" && proximoCliente.turno_id) {
-        await fetch(`${API}/turnos/${proximoCliente.turno_id}/estado`, {
+        await fetch(`${API}/admin/turnos/${proximoCliente.turno_id}`, {
           method: "PUT",
           headers: {
             Authorization: `Bearer ${token}`,

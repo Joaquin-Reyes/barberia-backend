@@ -101,7 +101,7 @@ export default function Turnos({ user, onLogout }) {
 
   async function cambiarEstado(id, nuevoEstado) {
     try {
-      await fetch(`${API}/turnos/${id}/estado`, {
+      await fetch(`${API}/admin/turnos/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ estado: nuevoEstado }),

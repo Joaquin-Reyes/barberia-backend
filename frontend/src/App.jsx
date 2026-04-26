@@ -59,8 +59,14 @@ function App() {
     return <Login onLogin={setUser} />
   }
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    localStorage.removeItem('token')
+    setUser(null)
+  }
+
   if (user.rol === 'superadmin') {
-    return <SuperAdminPanel user={user} onLogout={() => setUser(null)} />
+    return <SuperAdminPanel user={user} onLogout={handleLogout} />
   }
 
   const defaultRoute = user.rol === 'barbero' ? 'panel-barbero' : 'turnos'
@@ -68,9 +74,9 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Dashboard user={user} onLogout={() => setUser(null)} />}>
+        <Route path="/" element={<Dashboard user={user} onLogout={handleLogout} />}>
           <Route index element={<Navigate to={defaultRoute} replace />} />
-          <Route path="turnos" element={<Turnos user={user} onLogout={() => setUser(null)} />} />
+          <Route path="turnos" element={<Turnos user={user} onLogout={handleLogout} />} />
           <Route path="barberos" element={<Barberos user={user} />} />
           <Route path="facturacion" element={<Facturacion user={user} />} />
           <Route path="configuracion" element={<Configuracion user={user} />} />
