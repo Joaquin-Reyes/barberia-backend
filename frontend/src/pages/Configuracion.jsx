@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Building2, Plus, Scissors, CheckCircle2, X, Pencil, MessageCircle } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import { supabase, getAuthToken } from "../lib/supabase";
 
 const API = "https://barberia-backend-production-7dae.up.railway.app";
 
@@ -89,8 +89,7 @@ export default function Configuracion({ user }) {
   }
 
   async function consultarQR() {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    const token = await getAuthToken();
     if (!token) {
       console.warn('[consultarQR] Sin sesión activa, no se puede consultar el QR');
       detenerPolling();

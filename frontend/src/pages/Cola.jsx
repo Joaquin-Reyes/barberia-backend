@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { supabase } from "../lib/supabase";
+import { supabase, getAuthToken } from "../lib/supabase";
 
 const API = "https://barberia-backend-production-7dae.up.railway.app";
 
@@ -26,8 +26,7 @@ export default function Cola({ user }) {
   // ==============================
 
   async function cargarCola() {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    const token = await getAuthToken();
     try {
       const res = await fetch(`${API}/cola/${user.barberia_id}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -85,8 +84,7 @@ export default function Cola({ user }) {
   // ==============================
 
   async function terminar(barbero_id) {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    const token = await getAuthToken();
     try {
       const res = await fetch(`${API}/cola/terminar/${barbero_id}`, {
         method: "POST",
@@ -113,8 +111,7 @@ export default function Cola({ user }) {
       return;
     }
     setAgregando(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    const token = await getAuthToken();
     try {
       const res = await fetch(`${API}/cola/agregar`, {
         method: "POST",

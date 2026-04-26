@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+import { supabase, getAuthToken } from "../lib/supabase";
 
 const API = "https://barberia-backend-production-7dae.up.railway.app";
 
@@ -22,8 +22,7 @@ export default function PanelBarbero({ user }) {
   const [toast, setToast] = useState(null);
 
   async function cargarDatos() {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    const token = await getAuthToken();
     try {
       const [colaRes, turnosRes] = await Promise.all([
         fetch(`${API}/cola/${user.barberia_id}`, {
@@ -125,8 +124,7 @@ export default function PanelBarbero({ user }) {
   async function terminar() {
     if (!barberoId) return;
     setTerminando(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    const token = await getAuthToken();
     try {
       // Si el cliente actual es un turno reservado, marcarlo como completado
       if (proximoCliente?.tipo === "turno_reservado" && proximoCliente.turno_id) {

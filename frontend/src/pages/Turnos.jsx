@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Plus, Search, Pencil, X } from "lucide-react";
-import { supabase, turnoDisponible } from "../lib/supabase";
+import { supabase, turnoDisponible, getAuthToken } from "../lib/supabase";
 
 const API = "https://barberia-backend-production-7dae.up.railway.app";
 
@@ -236,8 +236,7 @@ export default function Turnos({ user, onLogout }) {
                       return;
                     }
                     try {
-                      const { data: { session } } = await supabase.auth.getSession();
-                      const token = session?.access_token;
+                      const token = await getAuthToken();
                       const res = await fetch(`${API}/admin/crear-turno`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },

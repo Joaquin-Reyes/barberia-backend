@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Plus, X, Calendar, AlertCircle, Check, Users } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import { supabase, getAuthToken } from "../lib/supabase";
 
 const API = "https://barberia-backend-production-7dae.up.railway.app";
 
@@ -213,8 +213,7 @@ export default function Barberos({ user }) {
                     return;
                   }
                   try {
-                    const { data: { session } } = await supabase.auth.getSession();
-                    const token = session?.access_token;
+                    const token = await getAuthToken();
                     const res = await fetch(`${API}/admin/barberos`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
