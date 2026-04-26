@@ -89,7 +89,15 @@ export default function Configuracion({ user }) {
   }
 
   async function consultarQR() {
-    const token = localStorage.getItem("token");
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) {
+      console.warn('[consultarQR] Sin sesión activa, no se puede consultar el QR');
+      detenerPolling();
+      setWpStatus(null);
+      return;
+    }
+    console.log('[consultarQR] Enviando token:', token.slice(0, 20) + '…');
     try {
       const res = await fetch(`${API}/admin/whatsapp/qr`, {
         headers: { Authorization: `Bearer ${token}` },
