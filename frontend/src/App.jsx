@@ -15,6 +15,11 @@ import './styles.css'
 function App() {
   const [user, setUser] = useState(null)
 
+  const hash = new URLSearchParams(window.location.hash.substring(1))
+  if (hash.get('type') === 'invite' && hash.get('access_token')) {
+    return <SetPassword />
+  }
+
   if (window.location.pathname === '/set-password') {
     return <SetPassword />
   }

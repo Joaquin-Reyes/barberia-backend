@@ -28,6 +28,7 @@ export default function SuperAdminPanel({ user, onLogout }) {
 async function crearBarberia() {
   if (!nombre || !email) return;
   try {
+    console.log("VITE_SUPERADMIN_SECRET:", import.meta.env.VITE_SUPERADMIN_SECRET);
     const res = await fetch(`${API}/superadmin/crear-barberia`, {
       method: "POST",
       headers: {
