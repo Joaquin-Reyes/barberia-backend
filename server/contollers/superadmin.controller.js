@@ -11,7 +11,7 @@ async function crearBarberia(req, res) {
     const { data: barberia, error: errorBarberia } =
       await supabaseAdmin
         .from("barberias")
-        .insert([{ nombre }])
+        .insert([{ nombre, whatsapp_mode: "wwebjs" }])
         .select()
         .single();
 

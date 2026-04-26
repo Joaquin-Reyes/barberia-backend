@@ -9,6 +9,7 @@ export default function SuperAdminPanel({ user, onLogout }) {
   const [email, setEmail] = useState("");
   const [configurando, setConfigurando] = useState(null); // id de la barbería que se está configurando
   const [whatsappForm, setWhatsappForm] = useState({
+    whatsapp_mode: "wwebjs",
     phone_number_id: "",
     whatsapp_token: "",
     whatsapp_number: "",
@@ -63,6 +64,7 @@ async function crearBarberia() {
     const { error } = await supabase
       .from("barberias")
       .update({
+        whatsapp_mode: whatsappForm.whatsapp_mode,
         phone_number_id: whatsappForm.phone_number_id,
         whatsapp_token: whatsappForm.whatsapp_token,
         whatsapp_number: whatsappForm.whatsapp_number,
@@ -139,6 +141,11 @@ async function crearBarberia() {
                 <div>
                   <p className="font-semibold">{b.nombre}</p>
                   <p className="text-xs text-neutral-400">{b.id}</p>
+                  {b.whatsapp_mode && (
+                    <p className="text-xs text-blue-400 mt-1">
+                      Modo: {b.whatsapp_mode === "wwebjs" ? "QR (wwebjs)" : b.whatsapp_mode}
+                    </p>
+                  )}
                   {b.whatsapp_number && (
                     <p className="text-xs text-green-400 mt-1">
                       ✓ WhatsApp: {b.whatsapp_number}
@@ -158,6 +165,7 @@ async function crearBarberia() {
                       } else {
                         setConfigurando(b.id);
                         setWhatsappForm({
+                          whatsapp_mode: b.whatsapp_mode || "wwebjs",
                           phone_number_id: b.phone_number_id || "",
                           whatsapp_token: b.whatsapp_token || "",
                           whatsapp_number: b.whatsapp_number || "",
@@ -181,6 +189,14 @@ async function crearBarberia() {
               {configurando === b.id && (
                 <div className="mt-3 pt-3 border-t border-neutral-700 flex flex-col gap-2">
                   <p className="text-sm text-neutral-400 mb-1">Configuración WhatsApp</p>
+                  <select
+                    value={whatsappForm.whatsapp_mode}
+                    onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsapp_mode: e.target.value })}
+                    className="input bg-neutral-700 text-white"
+                  >
+                    <option value="wwebjs">QR (whatsapp-web.js)</option>
+                    <option value="cloud_api">Cloud API (Meta)</option>
+                  </select>
                   <input
                     placeholder="Phone Number ID"
                     value={whatsappForm.phone_number_id}
