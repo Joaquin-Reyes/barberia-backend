@@ -397,7 +397,44 @@ export default function Turnos({ user, onLogout }) {
                       )}
                     </td>
 
-                    <td style={{ color: "#475569" }}>{t.barbero}</td>
+                    {/* Barbero editable */}
+                    <td>
+                      {editando.id === t.id && editando.campo === "barbero" ? (
+                        <select
+                          autoFocus
+                          defaultValue=""
+                          onBlur={() => setEditando({ id: null, campo: null, valor: "" })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") setEditando({ id: null, campo: null, valor: "" });
+                          }}
+                          onChange={async (e) => {
+                            if (!e.target.value) return;
+                            await supabase.from("turnos").update({ barbero: e.target.value }).eq("id", t.id);
+                            setEditando({ id: null, campo: null, valor: "" });
+                            traerTurnos();
+                          }}
+                          style={{ width: "100%", padding: "4px 6px", fontSize: 14 }}
+                        >
+                          <option value="" disabled>{t.barbero || "Sin asignar"}</option>
+                          {barberos.map((b) => (
+                            <option key={b.id} value={b.nombre}>{b.nombre}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ color: t.barbero ? "#475569" : "#94A3B8" }}>
+                            {t.barbero || "Sin asignar"}
+                          </span>
+                          <span
+                            className="opacity-0 group-hover:opacity-100"
+                            style={{ cursor: "pointer", transition: "opacity 0.15s", color: "#94A3B8" }}
+                            onClick={() => setEditando({ id: t.id, campo: "barbero", valor: t.barbero })}
+                          >
+                            <Pencil size={11} />
+                          </span>
+                        </span>
+                      )}
+                    </td>
                     <td style={{ color: "#475569", whiteSpace: "nowrap" }}>{t.fecha}</td>
                     <td style={{ color: "#475569" }}>{t.hora}</td>
 
