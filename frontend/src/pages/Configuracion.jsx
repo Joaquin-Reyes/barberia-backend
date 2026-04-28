@@ -11,8 +11,9 @@ export default function Configuracion({ user }) {
   const [barberia, setBarberia] = useState(null);
   const [editando, setEditando] = useState(false);
   const [toast, setToast] = useState(null);
-  const [wpStatus, setWpStatus] = useState(null); // null | 'loading' | 'initializing' | 'qr_pending' | 'authenticated'
+  const [wpStatus, setWpStatus] = useState(null);
   const [wpQR, setWpQR] = useState(null);
+  const [wpError, setWpError] = useState(null);
   const wpPollRef = useRef(null);
 
   useEffect(() => {
@@ -109,6 +110,7 @@ export default function Configuracion({ user }) {
       if (data.status === "authenticated") {
         setWpStatus("authenticated");
         setWpQR(null);
+        setWpError(null);
         detenerPolling();
       } else if (data.status === "qr_pending" && data.qr) {
         setWpQR(data.qr);
@@ -118,6 +120,7 @@ export default function Configuracion({ user }) {
         }
       } else {
         setWpStatus(data.status || "initializing");
+        if (data.error) setWpError(data.error);
         if (!wpPollRef.current) {
           wpPollRef.current = setInterval(consultarQR, 3000);
         }
@@ -365,12 +368,14 @@ export default function Configuracion({ user }) {
 
             {(wpStatus === "error" || wpStatus === "auth_failure") && (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8 }}>
-                  <span style={{ fontSize: 13, color: "#991B1B" }}>No se pudo conectar WhatsApp</span>
+                <div style={{ padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8 }}>
+                  <span style={{ fontSize: 13, color: "#991B1B", display: "block", fontWeight: 500 }}>No se pudo conectar WhatsApp</span>
+                  {wpError && <span style={{ fontSize: 12, color: "#B91C1C", display: "block", marginTop: 4 }}>{wpError}</span>}
+                  <span style={{ fontSize: 12, color: "#B91C1C", display: "block", marginTop: 4 }}>Reintentando automáticamente…</span>
                 </div>
                 <button onClick={conectarWhatsapp} style={{ background: "#16A34A", display: "flex", alignItems: "center", gap: 6 }}>
                   <MessageCircle size={13} />
-                  Reintentar
+                  Reintentar ahora
                 </button>
               </div>
             )}

@@ -95,6 +95,11 @@ function initClient(barberia_id) {
     console.error(`[wwebjs] Error init barberia ${barberia_id}:`, err.message);
     entry.status = 'error';
     entry.errorMessage = err.message;
+    clients.delete(barberia_id);
+    setTimeout(() => {
+      console.log(`[wwebjs] Reintentando init barberia ${barberia_id}...`);
+      initClient(barberia_id);
+    }, 15000);
   });
 
   return entry;

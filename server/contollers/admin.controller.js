@@ -211,6 +211,10 @@ async function getWhatsappQR(req, res) {
     entry = wwebjsManager.initClient(barberia_id);
   }
 
+  if (!entry) {
+    return res.status(503).json({ status: "error", error: "No se pudo inicializar el cliente WhatsApp" });
+  }
+
   if (entry.status === "authenticated") {
     return res.json({ status: "authenticated" });
   }
