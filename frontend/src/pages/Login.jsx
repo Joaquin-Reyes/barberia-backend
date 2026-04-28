@@ -37,8 +37,25 @@ export default function Login({ onLogin }) {
       .single();
 
     if (errorDB) {
-      console.error(errorDB);
-      setError("Error obteniendo usuario");
+      // El usuario existe en Auth pero no en la tabla usuarios → intentar activar
+      try {
+        const activarRes = await fetch("https://barberia-backend-production-7dae.up.railway.app/auth/activar", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (activarRes.ok) {
+          const { data: usuarioDBRetry } = await supabase
+            .from("usuarios")
+            .select("*")
+            .eq("id", data.user.id)
+            .single();
+          if (usuarioDBRetry) {
+            onLogin(usuarioDBRetry);
+            return;
+          }
+        }
+      } catch {}
+      setError("Tu cuenta no está activada. Pedile al admin que reenvíe la invitación.");
       setLoading(false);
       return;
     }
