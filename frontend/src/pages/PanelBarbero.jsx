@@ -13,13 +13,14 @@ function formatHora(str) {
 
 export default function PanelBarbero({ user }) {
   const [barberoId, setBarberoId] = useState(null);
-  // proximoCliente tiene la misma forma que la respuesta de /cola/terminar:
-  // null | { tipo: "turno_reservado" | "cola_espera" | "sin_clientes", nombre_cliente?, hora? }
   const [proximoCliente, setProximoCliente] = useState(null);
   const [turnosHoy, setTurnosHoy] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [terminando, setTerminando] = useState(false);
   const [toast, setToast] = useState(null);
+  const [modalCola, setModalCola] = useState(null); // { nombre_cliente } | null
+  const [servicioCola, setServicioCola] = useState("");
+  const [precioCola, setPrecioCola] = useState("");
 
   async function cargarDatos() {
     const token = await getAuthToken();
@@ -121,12 +122,22 @@ export default function PanelBarbero({ user }) {
     return () => supabase.removeChannel(channel);
   }, [user?.barberia_id]);
 
-  async function terminar() {
-    if (!barberoId) return;
+  function terminar() {
+    if (!barberoId || !proximoCliente) return;
+    if (proximoCliente.tipo === "cola_espera") {
+      setServicioCola("");
+      setPrecioCola("");
+      setModalCola({ nombre_cliente: proximoCliente.nombre_cliente });
+    } else {
+      ejecutarTerminar(null);
+    }
+  }
+
+  async function ejecutarTerminar(datosServicio) {
     setTerminando(true);
     const token = await getAuthToken();
     try {
-      // Si el cliente actual es un turno reservado, marcarlo como completado
+      // Si es turno reservado, marcarlo como completado
       if (proximoCliente?.tipo === "turno_reservado" && proximoCliente.turno_id) {
         await fetch(`${API}/admin/turnos/${proximoCliente.turno_id}`, {
           method: "PUT",
@@ -136,12 +147,27 @@ export default function PanelBarbero({ user }) {
           },
           body: JSON.stringify({ estado: "completado" }),
         });
-        // Actualizar la tabla localmente de inmediato
         setTurnosHoy((prev) =>
           prev.map((t) =>
             t.id === proximoCliente.turno_id ? { ...t, estado: "completado" } : t
           )
         );
+      }
+
+      // Si es cola de espera y se proporcionaron datos, registrar en turnos
+      if (proximoCliente?.tipo === "cola_espera" && datosServicio) {
+        await fetch(`${API}/barbero/registrar-atencion`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            nombre_cliente: proximoCliente.nombre_cliente,
+            servicio: datosServicio.servicio,
+            precio: datosServicio.precio,
+          }),
+        });
       }
 
       const res = await fetch(`${API}/cola/terminar/${barberoId}`, {
@@ -153,8 +179,16 @@ export default function PanelBarbero({ user }) {
       mostrarToast("Error al procesar", "error");
     } finally {
       setTerminando(false);
-      // Refrescar todo para mostrar el próximo cliente correcto
       await cargarDatos();
+    }
+  }
+
+  async function confirmarModalCola(registrar) {
+    setModalCola(null);
+    if (registrar) {
+      await ejecutarTerminar({ servicio: servicioCola, precio: precioCola });
+    } else {
+      await ejecutarTerminar(null);
     }
   }
 
@@ -206,6 +240,62 @@ export default function PanelBarbero({ user }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {toast && <div className={`toast ${toast.tipo}`}>{toast.mensaje}</div>}
+
+      {/* MODAL REGISTRO COLA */}
+      {modalCola && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 1000, padding: 16,
+        }}>
+          <div className="card" style={{ width: "100%", maxWidth: 360, margin: 0 }}>
+            <h2 style={{ marginBottom: 4 }}>Registrar servicio</h2>
+            <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 18px" }}>
+              {modalCola.nombre_cliente}
+            </p>
+
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 4 }}>
+              Servicio
+            </label>
+            <input
+              type="text"
+              placeholder="Ej: Corte + barba"
+              value={servicioCola}
+              onChange={e => setServicioCola(e.target.value)}
+              style={{ width: "100%", marginBottom: 12, boxSizing: "border-box" }}
+              autoFocus
+            />
+
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 4 }}>
+              Precio
+            </label>
+            <input
+              type="number"
+              placeholder="0"
+              value={precioCola}
+              onChange={e => setPrecioCola(e.target.value)}
+              style={{ width: "100%", marginBottom: 20, boxSizing: "border-box" }}
+            />
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => confirmarModalCola(true)}
+                disabled={terminando}
+                style={{ flex: 1, background: "#16a34a", padding: "11px 0" }}
+              >
+                {terminando ? "Guardando..." : "Registrar y terminar"}
+              </button>
+              <button
+                onClick={() => confirmarModalCola(false)}
+                disabled={terminando}
+                style={{ flex: 1, background: "#6b7280", padding: "11px 0" }}
+              >
+                Solo terminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* TOPBAR */}
       <div style={{

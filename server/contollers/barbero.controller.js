@@ -44,4 +44,54 @@ async function getTurnosBarbero(req, res) {
   }
 }
 
-module.exports = { getTurnosBarbero };
+async function registrarAtencionCola(req, res) {
+  const usuario_id = req.user.id;
+  const barberia_id = req.user.barberia_id;
+  const { nombre_cliente, servicio, precio } = req.body;
+
+  if (!nombre_cliente) {
+    return res.status(400).json({ error: "Falta nombre_cliente" });
+  }
+
+  try {
+    const { data: barbero, error: barberoError } = await supabaseAdmin
+      .from("barberos")
+      .select("id, nombre")
+      .eq("usuario_id", usuario_id)
+      .eq("barberia_id", barberia_id)
+      .single();
+
+    if (barberoError || !barbero) {
+      return res.status(404).json({ error: "Barbero no encontrado" });
+    }
+
+    const hoy = new Date().toISOString().split("T")[0];
+    const hora = new Date().toTimeString().slice(0, 5);
+
+    const { error } = await supabaseAdmin.from("turnos").insert({
+      nombre: nombre_cliente,
+      telefono: "",
+      servicio: servicio || "Sin especificar",
+      precio: Number(precio) || 0,
+      barbero: barbero.nombre,
+      fecha: hoy,
+      hora,
+      barberia_id,
+      estado: "completado",
+      recordatorio_24h: false,
+      recordatorio_3h: false,
+    });
+
+    if (error) {
+      console.error("❌ Error registrando atención de cola:", error);
+      return res.status(500).json({ error: "Error guardando" });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ Error en registrarAtencionCola:", err);
+    res.status(500).json({ error: "Error interno" });
+  }
+}
+
+module.exports = { getTurnosBarbero, registrarAtencionCola };
