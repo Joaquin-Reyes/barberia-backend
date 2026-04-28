@@ -1,5 +1,6 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const path = require('path');
+const fs = require('fs');
 
 // barberia_id → { client, qr, status }
 const clients = new Map();
@@ -90,6 +91,13 @@ function initClient(barberia_id) {
   });
 
   // TODO: habilitar bot para wwebjs cuando se requiera
+
+  // Eliminar lock files de Chromium que quedan de procesos anteriores
+  const profilePath = path.join(dataPath, `session-${clientId}`);
+  for (const lockFile of ['SingletonLock', 'SingletonSocket', 'SingletonCookie']) {
+    const lockPath = path.join(profilePath, lockFile);
+    try { fs.unlinkSync(lockPath); console.log(`[wwebjs] Lock eliminado: ${lockFile}`); } catch (_) {}
+  }
 
   client.initialize().catch((err) => {
     console.error(`[wwebjs] Error init barberia ${barberia_id}:`, err.message);
