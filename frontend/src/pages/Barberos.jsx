@@ -24,7 +24,7 @@ const horarioDefault = () => {
 
 export default function Barberos({ user }) {
   const [barberos, setBarberos] = useState([]);
-  const [nuevo, setNuevo] = useState({ nombre: "", telefono: "" });
+  const [nuevo, setNuevo] = useState({ nombre: "", telefono: "", email: "" });
   const [toast, setToast] = useState(null);
 
   const [barberoSeleccionado, setBarberoSeleccionado] = useState(null);
@@ -205,11 +205,17 @@ export default function Barberos({ user }) {
                 value={nuevo.telefono}
                 onChange={(e) => setNuevo({ ...nuevo, telefono: e.target.value })}
               />
+              <input
+                placeholder="Email (para invitación de acceso)"
+                type="email"
+                value={nuevo.email}
+                onChange={(e) => setNuevo({ ...nuevo, email: e.target.value })}
+              />
               <button
                 style={{ background: "#16A34A" }}
                 onClick={async () => {
-                  if (!nuevo.nombre || !nuevo.telefono) {
-                    mostrarToast("Completá nombre y teléfono", "error");
+                  if (!nuevo.nombre || !nuevo.telefono || !nuevo.email) {
+                    mostrarToast("Completá nombre, teléfono y email", "error");
                     return;
                   }
                   try {
@@ -220,8 +226,13 @@ export default function Barberos({ user }) {
                       body: JSON.stringify(nuevo),
                     });
                     if (res.ok) {
-                      mostrarToast("Barbero agregado correctamente");
-                      setNuevo({ nombre: "", telefono: "" });
+                      const data = await res.json();
+                      if (data.invite_warning) {
+                        mostrarToast("Barbero creado, pero no se pudo enviar el email", "error");
+                      } else {
+                        mostrarToast("Barbero agregado — se envió invitación por email");
+                      }
+                      setNuevo({ nombre: "", telefono: "", email: "" });
                       traerBarberos();
                     } else {
                       mostrarToast("Error al crear barbero", "error");

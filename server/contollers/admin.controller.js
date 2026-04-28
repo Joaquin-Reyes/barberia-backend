@@ -140,33 +140,34 @@ async function eliminarTurno(req, res) {
 }
 
 async function crearBarbero(req, res) {
-  const { nombre, telefono } = req.body;
+  const { nombre, telefono, email } = req.body;
   const barberia_id = req.user.barberia_id;
 
-  if (!nombre || !telefono) {
-    return res.status(400).json({ error: "Faltan datos" });
+  if (!nombre || !telefono || !email) {
+    return res.status(400).json({ error: "Faltan datos: nombre, teléfono y email son requeridos" });
   }
 
   try {
-    // Formatear teléfono: si el admin pone solo el número local (ej: "1123456789"),
-    // se le agrega el prefijo "549" automáticamente para WhatsApp
-    const telefonoFormateado = telefono.startsWith("549")
-      ? telefono
-      : "549" + telefono;
+    const telefonoFormateado = telefono.startsWith("549") ? telefono : "549" + telefono;
 
     const { data, error } = await supabaseAdmin
       .from("barberos")
-      .insert({
-        nombre,
-        telefono: telefonoFormateado,
-        barberia_id,
-      })
+      .insert({ nombre, telefono: telefonoFormateado, barberia_id })
       .select()
       .single();
 
     if (error) {
       console.log("❌ Error creando barbero:", error);
       return res.status(500).json({ error: "Error guardando barbero" });
+    }
+
+    const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      data: { rol: "barbero", barberia_id, nombre, barbero_id: data.id },
+    });
+
+    if (inviteError) {
+      console.log("⚠️ Error enviando invitación:", inviteError.message);
+      return res.json({ ...data, invite_warning: "Barbero creado pero no se pudo enviar el email de invitación" });
     }
 
     res.json(data);

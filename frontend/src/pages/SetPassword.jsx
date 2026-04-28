@@ -45,6 +45,15 @@ export default function SetPassword() {
       return;
     }
 
+    // Crear el registro en usuarios si es un barbero invitado
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      await fetch("https://barberia-backend-production-7dae.up.railway.app/auth/activar", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+    }
+
     setExito(true);
     setTimeout(() => {
       window.location.href = "/";
