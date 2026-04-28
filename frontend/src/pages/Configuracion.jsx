@@ -34,7 +34,8 @@ export default function Configuracion({ user }) {
       .eq("id", user.barberia_id)
       .single();
     setBarberia(data || null);
-    if (data?.whatsapp_mode === "wwebjs") {
+    if (data?.whatsapp_mode === "wwebjs" && !wpPollRef.current) {
+      setWpStatus((prev) => prev ?? "loading");
       consultarQR();
     }
   }
@@ -112,6 +113,9 @@ export default function Configuracion({ user }) {
       } else if (data.status === "qr_pending" && data.qr) {
         setWpQR(data.qr);
         setWpStatus("qr_pending");
+        if (!wpPollRef.current) {
+          wpPollRef.current = setInterval(consultarQR, 3000);
+        }
       } else {
         setWpStatus(data.status || "initializing");
         if (!wpPollRef.current) {
@@ -344,6 +348,30 @@ export default function Configuracion({ user }) {
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8 }}>
                 <CheckCircle2 size={16} color="#16A34A" />
                 <span style={{ fontSize: 13, fontWeight: 500, color: "#15803D" }}>WhatsApp conectado</span>
+              </div>
+            )}
+
+            {wpStatus === "disconnected" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8 }}>
+                  <span style={{ fontSize: 13, color: "#92400E" }}>Reconectando WhatsApp automáticamente…</span>
+                </div>
+                <button onClick={conectarWhatsapp} style={{ background: "#16A34A", display: "flex", alignItems: "center", gap: 6 }}>
+                  <MessageCircle size={13} />
+                  Reconectar ahora
+                </button>
+              </div>
+            )}
+
+            {(wpStatus === "error" || wpStatus === "auth_failure") && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8 }}>
+                  <span style={{ fontSize: 13, color: "#991B1B" }}>No se pudo conectar WhatsApp</span>
+                </div>
+                <button onClick={conectarWhatsapp} style={{ background: "#16A34A", display: "flex", alignItems: "center", gap: 6 }}>
+                  <MessageCircle size={13} />
+                  Reintentar
+                </button>
               </div>
             )}
           </div>
