@@ -9,6 +9,7 @@ const {
   eliminarTurno,
   crearBarbero,
   listarBarberos,
+  reenviarInvitacion,
   getWhatsappQR
 } = require("../contollers/admin.controller");
 
@@ -22,6 +23,7 @@ router.use("/barbero.html", (req, res, next) => {
 router.post("/crear-turno", authMiddleware, crearTurno);
 router.post("/barberos", authMiddleware, crearBarbero);
 router.get("/barberos", authMiddleware, listarBarberos);
+router.post("/barberos/:id/reenviar-invitacion", authMiddleware, reenviarInvitacion);
 router.get("/whatsapp/qr", authMiddleware, getWhatsappQR);
 
 // 🔐 Proteger panel HTML (deja pasar las APIs)

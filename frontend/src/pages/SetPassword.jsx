@@ -8,6 +8,8 @@ export default function SetPassword() {
   const [exito, setExito] = useState(false);
   const [tokenValido, setTokenValido] = useState(null); // null = verificando
 
+  const [esRecovery, setEsRecovery] = useState(false);
+
   useEffect(() => {
     const hash = window.location.hash.substring(1);
     const params = new URLSearchParams(hash);
@@ -15,10 +17,12 @@ export default function SetPassword() {
     const refreshToken = params.get("refresh_token") || "";
     const type = params.get("type");
 
-    if (!accessToken || type !== "invite") {
+    if (!accessToken || (type !== "invite" && type !== "recovery")) {
       setTokenValido(false);
       return;
     }
+
+    if (type === "recovery") setEsRecovery(true);
 
     supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
       .then(({ error }) => {
@@ -45,13 +49,15 @@ export default function SetPassword() {
       return;
     }
 
-    // Crear el registro en usuarios si es un barbero invitado
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.access_token) {
-      await fetch("https://barberia-backend-production-7dae.up.railway.app/auth/activar", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
+    // Solo activar cuenta si es una invitación nueva (no un reset de contraseña)
+    if (!esRecovery) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        await fetch("https://barberia-backend-production-7dae.up.railway.app/auth/activar", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+      }
     }
 
     setExito(true);
@@ -85,7 +91,9 @@ export default function SetPassword() {
       <div className="min-h-screen bg-neutral-950 flex items-center justify-center text-white">
         <div className="bg-neutral-900 p-8 rounded-xl text-center max-w-sm w-full">
           <p className="text-2xl mb-2">✅</p>
-          <p className="font-semibold mb-1">Contraseña establecida</p>
+          <p className="font-semibold mb-1">
+            {esRecovery ? "Contraseña actualizada" : "Contraseña establecida"}
+          </p>
           <p className="text-sm text-neutral-400">Redirigiendo al login...</p>
         </div>
       </div>
@@ -95,8 +103,12 @@ export default function SetPassword() {
   return (
     <div className="min-h-screen bg-neutral-950 flex items-center justify-center text-white">
       <div className="bg-neutral-900 p-8 rounded-xl w-full max-w-sm">
-        <h1 className="text-xl font-bold mb-1">Establecé tu contraseña</h1>
-        <p className="text-sm text-neutral-400 mb-6">Ingresá una contraseña para activar tu cuenta.</p>
+        <h1 className="text-xl font-bold mb-1">
+          {esRecovery ? "Nueva contraseña" : "Establecé tu contraseña"}
+        </h1>
+        <p className="text-sm text-neutral-400 mb-6">
+          {esRecovery ? "Ingresá tu nueva contraseña." : "Ingresá una contraseña para activar tu cuenta."}
+        </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <input

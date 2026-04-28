@@ -177,6 +177,41 @@ async function crearBarbero(req, res) {
   }
 }
 
+async function reenviarInvitacion(req, res) {
+  const { id } = req.params;
+  const { email } = req.body;
+  const barberia_id = req.user.barberia_id;
+
+  if (!email) return res.status(400).json({ error: "Falta email" });
+
+  try {
+    const { data: barbero, error: barberoError } = await supabaseAdmin
+      .from("barberos")
+      .select("id, nombre, barberia_id")
+      .eq("id", id)
+      .eq("barberia_id", barberia_id)
+      .single();
+
+    if (barberoError || !barbero) {
+      return res.status(404).json({ error: "Barbero no encontrado" });
+    }
+
+    const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      data: { rol: "barbero", barberia_id: barbero.barberia_id, nombre: barbero.nombre, barbero_id: barbero.id },
+    });
+
+    if (inviteError) {
+      console.log("⚠️ Error reenviando invitación:", inviteError.message);
+      return res.status(500).json({ error: inviteError.message });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.log("❌ Error general:", err);
+    res.status(500).json({ error: "Error interno" });
+  }
+}
+
 async function listarBarberos(req, res) {
   const barberia_id = req.user.barberia_id;
 
@@ -239,5 +274,6 @@ module.exports = {
   eliminarTurno,
   crearBarbero,
   listarBarberos,
+  reenviarInvitacion,
   getWhatsappQR
 };

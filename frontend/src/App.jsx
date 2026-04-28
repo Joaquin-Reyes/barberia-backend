@@ -18,7 +18,7 @@ function App() {
   const [cargando, setCargando] = useState(true)
 
   const hash = new URLSearchParams(window.location.hash.substring(1))
-  const esInvite = hash.get('type') === 'invite' && hash.get('access_token')
+  const esInvite = (hash.get('type') === 'invite' || hash.get('type') === 'recovery') && hash.get('access_token')
 
   useEffect(() => {
     if (esInvite) {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, X, Calendar, AlertCircle, Check, Users } from "lucide-react";
+import { Plus, X, Calendar, AlertCircle, Check, Users, Mail } from "lucide-react";
 import { supabase, getAuthToken } from "../lib/supabase";
 
 const API = "https://barberia-backend-production-7dae.up.railway.app";
@@ -28,6 +28,9 @@ export default function Barberos({ user }) {
   const [toast, setToast] = useState(null);
 
   const [barberoSeleccionado, setBarberoSeleccionado] = useState(null);
+  const [modalReenvio, setModalReenvio] = useState(null); // { id, nombre } | null
+  const [emailReenvio, setEmailReenvio] = useState("");
+  const [enviandoInvitacion, setEnviandoInvitacion] = useState(false);
   const [horarioSemanal, setHorarioSemanal] = useState(horarioDefault());
   const [guardandoHorario, setGuardandoHorario] = useState(false);
 
@@ -149,6 +152,31 @@ export default function Barberos({ user }) {
     mostrarToast("Excepción eliminada");
   }
 
+  async function reenviarInvitacion() {
+    if (!emailReenvio) { mostrarToast("Ingresá un email", "error"); return; }
+    setEnviandoInvitacion(true);
+    try {
+      const token = await getAuthToken();
+      const res = await fetch(`${API}/admin/barberos/${modalReenvio.id}/reenviar-invitacion`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ email: emailReenvio }),
+      });
+      if (res.ok) {
+        mostrarToast("Invitación reenviada correctamente");
+        setModalReenvio(null);
+        setEmailReenvio("");
+      } else {
+        const data = await res.json();
+        mostrarToast(data.error || "Error al reenviar invitación", "error");
+      }
+    } catch {
+      mostrarToast("Error de conexión", "error");
+    } finally {
+      setEnviandoInvitacion(false);
+    }
+  }
+
   const mostrarToast = (mensaje, tipo = "success") => {
     setToast({ mensaje, tipo });
     setTimeout(() => setToast(null), 3000);
@@ -172,6 +200,50 @@ export default function Barberos({ user }) {
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
 
       {toast && <div className={`toast ${toast.tipo}`}>{toast.mensaje}</div>}
+
+      {/* ─── MODAL REENVIAR INVITACIÓN ─── */}
+      {modalReenvio && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 1000, padding: 16,
+        }}>
+          <div className="card" style={{ width: "100%", maxWidth: 360, margin: 0 }}>
+            <h2 style={{ marginBottom: 4 }}>Reenviar acceso</h2>
+            <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 18px" }}>
+              {modalReenvio.nombre} — ingresá el email para reenviar la invitación.
+            </p>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 4 }}>
+              Email
+            </label>
+            <input
+              type="email"
+              placeholder="email@ejemplo.com"
+              value={emailReenvio}
+              onChange={e => setEmailReenvio(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && reenviarInvitacion()}
+              style={{ width: "100%", marginBottom: 20, boxSizing: "border-box" }}
+              autoFocus
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={reenviarInvitacion}
+                disabled={enviandoInvitacion}
+                style={{ flex: 1, background: "#2563EB", padding: "11px 0" }}
+              >
+                {enviandoInvitacion ? "Enviando..." : "Enviar invitación"}
+              </button>
+              <button
+                onClick={() => { setModalReenvio(null); setEmailReenvio(""); }}
+                disabled={enviandoInvitacion}
+                style={{ flex: 1, background: "#6b7280", padding: "11px 0" }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── TOPBAR ─── */}
       <div style={topbarStyle}>
@@ -306,19 +378,28 @@ export default function Barberos({ user }) {
                         {isSelected ? "Expandido abajo" : "Clic para configurar"}
                       </td>
                       {esAdmin && (
-                        <td onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={async () => {
-                              if (barberoSeleccionado?.id === b.id) setBarberoSeleccionado(null);
-                              await supabase.from("barberos").delete().eq("id", b.id);
-                              traerBarberos();
-                              mostrarToast("Barbero eliminado");
-                            }}
-                            className="btn-delete"
-                            style={{ padding: "5px 8px", display: "flex", alignItems: "center" }}
-                          >
-                            <X size={13} />
-                          </button>
+                        <td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: "nowrap" }}>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <button
+                              onClick={() => { setModalReenvio({ id: b.id, nombre: b.nombre }); setEmailReenvio(""); }}
+                              title="Reenviar acceso"
+                              style={{ padding: "5px 8px", display: "flex", alignItems: "center", background: "#1e40af", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
+                            >
+                              <Mail size={13} />
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (barberoSeleccionado?.id === b.id) setBarberoSeleccionado(null);
+                                await supabase.from("barberos").delete().eq("id", b.id);
+                                traerBarberos();
+                                mostrarToast("Barbero eliminado");
+                              }}
+                              className="btn-delete"
+                              style={{ padding: "5px 8px", display: "flex", alignItems: "center" }}
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
                         </td>
                       )}
                     </tr>
