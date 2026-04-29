@@ -230,7 +230,7 @@ async function activarBarberoDirecto({ barbero, email }) {
 
     if (existente) return; // ya activado
 
-    await supabaseAdmin.from("usuarios").insert({
+    const { error: insertErr } = await supabaseAdmin.from("usuarios").insert({
       id: authUser.id,
       email: authUser.email,
       rol: "barbero",
@@ -238,6 +238,11 @@ async function activarBarberoDirecto({ barbero, email }) {
       nombre: barbero.nombre,
       barbero_id: barbero.id,
     });
+
+    if (insertErr) {
+      console.log("⚠️ activarBarberoDirecto: insert en usuarios falló:", insertErr.message);
+      return;
+    }
 
     await supabaseAdmin
       .from("barberos")

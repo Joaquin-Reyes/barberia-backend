@@ -80,10 +80,30 @@ async function activarCuenta(req, res) {
   // (puede pasar cuando Supabase no actualiza metadata para usuarios ya existentes)
   console.log("⚠️ Metadata incompleta para user", user.id, "| metadata:", user.user_metadata, "| intentando fallback por email");
 
+  // Caso 1: el barbero ya tiene usuario_id = user.id pero nunca se creó el registro en usuarios
+  const { data: barberoYaVinculado } = await supabaseAdmin
+    .from("barberos")
+    .select("id, nombre, barberia_id")
+    .eq("usuario_id", user.id)
+    .maybeSingle();
+
+  if (barberoYaVinculado) {
+    const { error: insertError } = await supabaseAdmin
+      .from("usuarios")
+      .insert({ id: user.id, email: user.email, rol: "barbero", barberia_id: barberoYaVinculado.barberia_id, nombre: barberoYaVinculado.nombre, barbero_id: barberoYaVinculado.id });
+    if (insertError) {
+      console.log("❌ Error creando usuario (fallback vinculado):", insertError);
+      return res.status(500).json({ error: "Error creando usuario" });
+    }
+    console.log("✅ Activación por barbero ya vinculado para", user.email, "→", barberoYaVinculado.nombre);
+    return res.json({ ok: true });
+  }
+
+  // Caso 2: buscar barbero sin vincular
   const { data: barberoMatch } = await supabaseAdmin
     .from("barberos")
     .select("id, nombre, barberia_id")
-    .is("usuario_id", null) // solo barberos sin cuenta activa
+    .is("usuario_id", null)
     .limit(50);
 
   // Buscar en Supabase Auth si el email del usuario coincide con algún barbero pendiente

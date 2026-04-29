@@ -36,7 +36,7 @@ function App() {
         .from('usuarios')
         .select('*')
         .eq('id', session.user.id)
-        .single()
+        .maybeSingle()
 
       if (usuarioDB) setUser(usuarioDB)
       setCargando(false)

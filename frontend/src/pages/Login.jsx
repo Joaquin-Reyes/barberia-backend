@@ -30,13 +30,13 @@ export default function Login({ onLogin }) {
     const token = data.session.access_token;
     localStorage.setItem("token", token);
 
-    const { data: usuarioDB, error: errorDB } = await supabase
+    const { data: usuarioDB } = await supabase
       .from("usuarios")
       .select("*")
       .eq("id", data.user.id)
-      .single();
+      .maybeSingle();
 
-    if (errorDB) {
+    if (!usuarioDB) {
       // El usuario existe en Auth pero no en la tabla usuarios → intentar activar
       try {
         const activarRes = await fetch("https://barberia-backend-production-7dae.up.railway.app/auth/activar", {
@@ -48,7 +48,7 @@ export default function Login({ onLogin }) {
             .from("usuarios")
             .select("*")
             .eq("id", data.user.id)
-            .single();
+            .maybeSingle();
           if (usuarioDBRetry) {
             onLogin(usuarioDBRetry);
             return;
