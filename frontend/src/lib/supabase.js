@@ -28,13 +28,13 @@ export async function login(email, password) {
   return data;
 }
 
-// Devuelve siempre un access_token válido.
-// Intenta primero la sesión activa del cliente Supabase (que puede haberse
-// auto-refrescado); si no hay sesión cae al token guardado manualmente en
-// localStorage para no romper sesiones donde Supabase perdió su estado.
 export async function getAuthToken() {
   const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token ?? localStorage.getItem("token") ?? null;
+  if (session?.access_token) {
+    localStorage.setItem("token", session.access_token);
+    return session.access_token;
+  }
+  return localStorage.getItem("token") ?? null;
 }
 
 

@@ -201,13 +201,16 @@ async function reenviarInvitacion(req, res) {
     });
 
     if (inviteError) {
-      console.log("⚠️ Error reenviando invitación:", inviteError.message);
-      return res.status(500).json({ error: inviteError.message });
+      console.log("⚠️ Email de invitación falló (puede ser usuario ya confirmado):", inviteError.message);
+      // No retornar 500 todavía — el usuario puede ya estar en Auth, intentar activación directa
     }
 
-    // También intentar activación directa por si el usuario ya existe en Auth
-    // (Supabase puede ignorar el invite para usuarios ya confirmados)
-    await activarBarberoDirecto({ barbero, email });
+    // Siempre intentar activación directa (idempotente)
+    const activado = await activarBarberoDirecto({ barbero, email });
+
+    if (inviteError && !activado) {
+      return res.status(500).json({ error: `No se pudo enviar invitación ni activar la cuenta: ${inviteError.message}` });
+    }
 
     res.json({ ok: true });
   } catch (err) {
@@ -220,7 +223,7 @@ async function activarBarberoDirecto({ barbero, email }) {
   try {
     const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
     const authUser = users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
-    if (!authUser) return;
+    if (!authUser) return false;
 
     const { data: existente } = await supabaseAdmin
       .from("usuarios")
@@ -228,7 +231,7 @@ async function activarBarberoDirecto({ barbero, email }) {
       .eq("id", authUser.id)
       .maybeSingle();
 
-    if (existente) return; // ya activado
+    if (existente) return true; // ya activado
 
     const { error: insertErr } = await supabaseAdmin.from("usuarios").insert({
       id: authUser.id,
@@ -241,7 +244,7 @@ async function activarBarberoDirecto({ barbero, email }) {
 
     if (insertErr) {
       console.log("⚠️ activarBarberoDirecto: insert en usuarios falló:", insertErr.message);
-      return;
+      return false;
     }
 
     await supabaseAdmin
@@ -250,8 +253,10 @@ async function activarBarberoDirecto({ barbero, email }) {
       .eq("id", barbero.id);
 
     console.log("✅ Activación directa exitosa para", email);
+    return true;
   } catch (err) {
     console.log("⚠️ activarBarberoDirecto falló (no crítico):", err.message);
+    return false;
   }
 }
 
