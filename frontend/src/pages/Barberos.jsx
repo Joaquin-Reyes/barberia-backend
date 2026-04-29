@@ -184,17 +184,6 @@ export default function Barberos({ user }) {
 
   const esAdmin = user.rol === "admin" || user.rol === "superadmin";
 
-  const topbarStyle = {
-    padding: "14px 24px",
-    background: "#ffffff",
-    borderBottom: "1px solid #E2E8F0",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    position: "sticky",
-    top: 0,
-    zIndex: 10,
-  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -246,7 +235,7 @@ export default function Barberos({ user }) {
       )}
 
       {/* ─── TOPBAR ─── */}
-      <div style={topbarStyle}>
+      <div className="topbar" style={{ position: "sticky", top: 0, zIndex: 10 }}>
         <div>
           <h1 style={{ fontSize: 15, fontWeight: 600, margin: 0, letterSpacing: "-0.02em", color: "#0F172A" }}>
             Barberos
@@ -257,7 +246,7 @@ export default function Barberos({ user }) {
         </div>
       </div>
 
-      <div style={{ padding: "24px", overflowY: "auto" }}>
+      <div className="page-content">
 
         {/* ─── AGREGAR BARBERO ─── */}
         {esAdmin && (
@@ -498,17 +487,7 @@ export default function Barberos({ user }) {
               </p>
 
               {/* FORM NUEVA EXCEPCIÓN */}
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr 1fr auto",
-                gap: 8,
-                alignItems: "end",
-                marginBottom: 20,
-                padding: "16px",
-                background: "#F8FAFC",
-                borderRadius: 8,
-                border: "1px solid #E2E8F0",
-              }}>
+              <div className="excepcion-form-grid">
                 <div>
                   <label style={{ fontSize: 11, fontWeight: 600, color: "#475569", display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                     Fecha

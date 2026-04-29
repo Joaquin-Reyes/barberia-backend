@@ -154,14 +154,7 @@ export default function Cola({ user }) {
       {toast && <div className={`toast ${toast.tipo}`}>{toast.mensaje}</div>}
 
       {/* TOPBAR */}
-      <div style={{
-        padding: "16px 24px",
-        background: "#ffffff",
-        borderBottom: "1px solid #e5e7eb",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-      }}>
+      <div className="topbar">
         <div>
           <h1 style={{ fontSize: "16px", fontWeight: "600", margin: 0 }}>Cola de espera</h1>
           <p style={{ fontSize: "12px", color: "#9ca3af", margin: "2px 0 0" }}>
@@ -181,7 +174,7 @@ export default function Cola({ user }) {
           Cargando...
         </div>
       ) : (
-        <div style={{ padding: "24px", overflowY: "auto" }}>
+        <div className="page-content">
 
           {/* BARBEROS */}
           <div className="card" style={{ marginBottom: "20px" }}>
@@ -331,7 +324,7 @@ export default function Cola({ user }) {
               value={nombreCliente}
               onChange={(e) => setNombreCliente(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && agregarCliente()}
-              style={{ marginBottom: 12 }}
+              style={{ marginBottom: 12, width: "100%", boxSizing: "border-box" }}
             />
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <button

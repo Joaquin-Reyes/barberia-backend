@@ -298,15 +298,13 @@ export default function PanelBarbero({ user }) {
       )}
 
       {/* TOPBAR */}
-      <div style={{
-        padding: "16px 24px",
-        background: "#fff",
-        borderBottom: "1px solid #e5e7eb",
-      }}>
-        <h1 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Mi Panel</h1>
-        <p style={{ fontSize: 12, color: "#9ca3af", margin: "2px 0 0" }}>
-          {user?.nombre || user?.email}
-        </p>
+      <div className="topbar">
+        <div>
+          <h1 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Mi Panel</h1>
+          <p style={{ fontSize: 12, color: "#9ca3af", margin: "2px 0 0" }}>
+            {user?.nombre || user?.email}
+          </p>
+        </div>
       </div>
 
       {cargando ? (
@@ -314,7 +312,7 @@ export default function PanelBarbero({ user }) {
           Cargando...
         </div>
       ) : (
-        <div style={{ padding: 24, overflowY: "auto" }}>
+        <div className="page-content">
 
           {/* CARD TURNO ACTUAL */}
           <div className="card" style={{ marginBottom: 20 }}>

@@ -135,18 +135,6 @@ export default function Turnos({ user, onLogout }) {
   const confirmados = turnos.filter(t => t.estado === "confirmado").length;
   const completados = turnos.filter(t => t.estado === "completado").length;
 
-  /* ─── Estilos compartidos ─── */
-  const topbarStyle = {
-    padding: "14px 24px",
-    background: "#ffffff",
-    borderBottom: "1px solid #E2E8F0",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    position: "sticky",
-    top: 0,
-    zIndex: 10,
-  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -154,7 +142,7 @@ export default function Turnos({ user, onLogout }) {
       {toast && <div className={`toast ${toast.tipo}`}>{toast.mensaje}</div>}
 
       {/* ─── TOPBAR ─── */}
-      <div style={topbarStyle}>
+      <div className="topbar" style={{ position: "sticky", top: 0, zIndex: 10 }}>
         <div>
           <h1 style={{ fontSize: 15, fontWeight: 600, margin: 0, letterSpacing: "-0.02em", color: "#0F172A" }}>
             Turnos
@@ -171,7 +159,7 @@ export default function Turnos({ user, onLogout }) {
       </div>
 
       {/* ─── CONTENIDO ─── */}
-      <div style={{ padding: "24px", flex: 1, overflowY: "auto" }}>
+      <div className="page-content" style={{ flex: 1 }}>
 
         {/* CREAR TURNO */}
         {(user.rol === "admin" || user.rol === "superadmin") && (
@@ -305,7 +293,7 @@ export default function Turnos({ user, onLogout }) {
               <thead>
                 <tr>
                   <th>Nombre</th>
-                  <th>Teléfono</th>
+                  <th className="col-mobile-hide">Teléfono</th>
                   <th>Servicio</th>
                   <th>Barbero</th>
                   <th>Fecha</th>
@@ -352,7 +340,7 @@ export default function Turnos({ user, onLogout }) {
                       )}
                     </td>
 
-                    <td style={{ color: "#475569" }}>{t.telefono}</td>
+                    <td className="col-mobile-hide" style={{ color: "#475569" }}>{t.telefono}</td>
 
                     {/* Servicio editable */}
                     <td>
