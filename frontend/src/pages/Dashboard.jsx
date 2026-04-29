@@ -2,16 +2,16 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { LayoutDashboard, Users, DollarSign, Settings, LogOut, Clock, Scissors } from 'lucide-react'
 
 const adminNavItems = [
-  { to: 'turnos',        label: 'Turnos',        icon: LayoutDashboard },
-  { to: 'barberos',      label: 'Barberos',       icon: Users           },
-  { to: 'cola',          label: 'Cola',           icon: Clock           },
-  { to: 'facturacion',   label: 'Facturación',    icon: DollarSign      },
-  { to: 'configuracion', label: 'Configuración',  icon: Settings        },
+  { to: 'turnos',        label: 'Turnos',        mobileLabel: 'Turnos',   icon: LayoutDashboard },
+  { to: 'barberos',      label: 'Barberos',       mobileLabel: 'Barberos', icon: Users           },
+  { to: 'cola',          label: 'Cola',           mobileLabel: 'Cola',     icon: Clock           },
+  { to: 'facturacion',   label: 'Facturación',    mobileLabel: 'Factura',  icon: DollarSign      },
+  { to: 'configuracion', label: 'Configuración',  mobileLabel: 'Config',   icon: Settings        },
 ]
 
 const barberoNavItems = [
-  { to: 'panel-barbero', label: 'Mi Panel', icon: Scissors },
-  { to: 'cola',          label: 'Cola',     icon: Clock    },
+  { to: 'panel-barbero', label: 'Mi Panel', mobileLabel: 'Panel', icon: Scissors },
+  { to: 'cola',          label: 'Cola',     mobileLabel: 'Cola',  icon: Clock    },
 ]
 
 function Dashboard({ user, onLogout }) {
@@ -106,7 +106,7 @@ function Dashboard({ user, onLogout }) {
         className="navbar-mobile fixed bottom-0 left-0 right-0 bg-white z-50"
         style={{ borderTop: '1px solid #E2E8F0' }}
       >
-        {navItems.map(({ to, label, icon: Icon }) => (
+        {navItems.map(({ to, mobileLabel, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
@@ -117,7 +117,7 @@ function Dashboard({ user, onLogout }) {
             }
           >
             <Icon size={20} />
-            {label}
+            {mobileLabel}
           </NavLink>
         ))}
         <button
