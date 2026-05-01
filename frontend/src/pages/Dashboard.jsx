@@ -12,7 +12,6 @@ const adminNavItems = [
 
 const barberoNavItems = [
   { to: 'panel-barbero', label: 'Mi Panel', icon: Scissors },
-  { to: 'cola',          label: 'Cola',     icon: Clock    },
 ]
 
 function Dashboard({ user, onLogout }) {

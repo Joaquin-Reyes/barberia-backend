@@ -109,7 +109,9 @@ function App() {
           <Route path="barberos" element={<Barberos user={user} />} />
           <Route path="facturacion" element={<Facturacion user={user} />} />
           <Route path="configuracion" element={<Configuracion user={user} />} />
-          <Route path="cola" element={<Cola user={user} />} />
+          {user.rol !== 'barbero' && (
+            <Route path="cola" element={<Cola user={user} />} />
+          )}
           {user.rol === 'barbero' && (
             <Route path="panel-barbero" element={<PanelBarbero user={user} />} />
           )}
