@@ -251,11 +251,15 @@ export default function Facturacion({ user }) {
                   {barberosList.map((b, i) => (
                     <tr key={b.nombre}>
                       <td>
-                        <span style={{ fontWeight: 700, fontSize: 15 }}>
-                          {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : (
-                            <span style={{ color: "#94A3B8", fontSize: 13 }}>#{i + 1}</span>
-                          )}
-                        </span>
+                        {i < 3 ? (
+                          <Trophy
+                            size={16}
+                            color={i === 0 ? "#D97706" : i === 1 ? "#64748B" : "#B45309"}
+                            aria-label={`Puesto ${i + 1}`}
+                          />
+                        ) : (
+                          <span style={{ color: "#94A3B8", fontSize: 13, fontWeight: 700 }}>#{i + 1}</span>
+                        )}
                       </td>
                       <td>
                         <span style={{ fontWeight: 500 }}>{b.nombre}</span>

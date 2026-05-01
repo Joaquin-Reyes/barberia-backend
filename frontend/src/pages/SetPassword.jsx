@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AlertTriangle, CheckCircle } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 export default function SetPassword() {
@@ -82,7 +83,7 @@ export default function SetPassword() {
         });
         if (!activarRes.ok) {
           const body = await activarRes.json().catch(() => ({}));
-          console.error("❌ activar failed:", body);
+          console.error("activar failed:", body);
           // Solo bloquear si NO es un reset de contraseña para un usuario ya activo
           if (!esRecovery) {
             setError("No se pudo activar la cuenta. Pedile al admin que reenvíe la invitación.");
@@ -110,7 +111,7 @@ export default function SetPassword() {
     return (
       <div className="min-h-screen bg-neutral-950 flex items-center justify-center text-white">
         <div className="bg-neutral-900 p-8 rounded-xl text-center max-w-sm w-full">
-          <p className="text-2xl mb-2">⚠️</p>
+          <AlertTriangle size={28} className="mx-auto mb-3 text-yellow-400" />
           <p className="font-semibold mb-1">Link inválido o expirado</p>
           <p className="text-sm text-neutral-400">Pedile al administrador que reenvíe la invitación.</p>
         </div>
@@ -122,7 +123,7 @@ export default function SetPassword() {
     return (
       <div className="min-h-screen bg-neutral-950 flex items-center justify-center text-white">
         <div className="bg-neutral-900 p-8 rounded-xl text-center max-w-sm w-full">
-          <p className="text-2xl mb-2">✅</p>
+          <CheckCircle size={28} className="mx-auto mb-3 text-green-400" />
           <p className="font-semibold mb-1">
             {esRecovery ? "Contraseña actualizada" : "Contraseña establecida"}
           </p>

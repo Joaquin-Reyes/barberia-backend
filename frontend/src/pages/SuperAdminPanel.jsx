@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AlertTriangle, CheckCircle, Crown, Plus, Store } from "lucide-react";
 import { getAuthToken } from "../lib/supabase";
 
 const API = "https://barberia-backend-production-7dae.up.railway.app";
@@ -53,12 +54,12 @@ async function crearBarberia() {
       setNombre("");
       setEmail("");
       traerBarberias();
-      mostrarToast("Barbería creada ✅");
+      mostrarToast("Barbería creada");
     } else {
-      mostrarToast(data.error || "Error al crear ❌", "error");
+      mostrarToast(data.error || "Error al crear", "error");
     }
   } catch (err) {
-    mostrarToast("Error de conexión ❌", "error");
+    mostrarToast("Error de conexión", "error");
   }
 }
 
@@ -73,7 +74,7 @@ async function crearBarberia() {
       body: JSON.stringify({ activo: !barberia.activo }),
     });
     if (res.ok) traerBarberias();
-    else mostrarToast("Error al cambiar estado ❌", "error");
+    else mostrarToast("Error al cambiar estado", "error");
   }
 
   async function guardarWhatsapp(id) {
@@ -93,12 +94,12 @@ async function crearBarberia() {
     });
 
     if (res.ok) {
-      mostrarToast("WhatsApp configurado ✅");
+      mostrarToast("WhatsApp configurado");
       setConfigurando(null);
       setWhatsappForm({ whatsapp_mode: "wwebjs", phone_number_id: "", whatsapp_token: "", whatsapp_number: "" });
       traerBarberias();
     } else {
-      mostrarToast("Error al guardar ❌", "error");
+      mostrarToast("Error al guardar", "error");
     }
   }
 
@@ -115,7 +116,10 @@ async function crearBarberia() {
       {/* HEADER */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold">👑 Panel SuperAdmin</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Crown size={22} />
+            Panel SuperAdmin
+          </h1>
           <p className="text-sm text-neutral-400">{user.email} · {user.rol}</p>
         </div>
         <button onClick={onLogout} className="bg-neutral-800 px-4 py-1 rounded">
@@ -125,7 +129,10 @@ async function crearBarberia() {
 
       {/* CREAR BARBERÍA */}
       <div className="mb-6 bg-neutral-900 p-4 rounded-xl">
-        <h2 className="text-lg font-semibold mb-4">➕ Crear barbería + admin</h2>
+        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <Plus size={18} />
+          Crear barbería + admin
+        </h2>
         <div className="flex flex-col gap-3">
           <input
             placeholder="Nombre de la barbería"
@@ -152,7 +159,10 @@ async function crearBarberia() {
 
       {/* LISTA DE BARBERÍAS */}
       <div className="bg-neutral-900 p-4 rounded-xl">
-        <h2 className="text-lg font-semibold mb-4">🏪 Barberías</h2>
+        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <Store size={18} />
+          Barberías
+        </h2>
         <div className="space-y-3">
           {barberias.map((b) => (
             <div key={b.id} className="bg-neutral-800 p-3 rounded">
@@ -168,13 +178,15 @@ async function crearBarberia() {
                     </p>
                   )}
                   {b.whatsapp_number && (
-                    <p className="text-xs text-green-400 mt-1">
-                      ✓ WhatsApp: {b.whatsapp_number}
+                    <p className="text-xs text-green-400 mt-1 flex items-center gap-1">
+                      <CheckCircle size={12} />
+                      WhatsApp: {b.whatsapp_number}
                     </p>
                   )}
                   {!b.whatsapp_number && (
-                    <p className="text-xs text-yellow-400 mt-1">
-                      ⚠ WhatsApp no configurado
+                    <p className="text-xs text-yellow-400 mt-1 flex items-center gap-1">
+                      <AlertTriangle size={12} />
+                      WhatsApp no configurado
                     </p>
                   )}
                 </div>
