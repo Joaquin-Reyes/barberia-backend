@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { listarBarberias, crearBarberia } = require("../contollers/superadmin.controller");
+const { listarBarberias, crearBarberia, actualizarBarberia } = require("../contollers/superadmin.controller");
 
 function validarSuperadmin(req, res, next) {
   const secret = req.headers["x-superadmin-secret"];
@@ -12,5 +12,6 @@ function validarSuperadmin(req, res, next) {
 
 router.get("/barberias", validarSuperadmin, listarBarberias);
 router.post("/crear-barberia", validarSuperadmin, crearBarberia);
+router.patch("/barberias/:id", validarSuperadmin, actualizarBarberia);
 
 module.exports = router;

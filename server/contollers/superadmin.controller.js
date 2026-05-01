@@ -30,7 +30,7 @@ async function crearBarberia(req, res) {
     const { data: barberia, error: errorBarberia } =
       await supabaseAdmin
         .from("barberias")
-        .insert([{ nombre, whatsapp_mode: "wwebjs" }])
+        .insert([{ nombre, whatsapp_mode: "wwebjs", activo: true }])
         .select()
         .single();
 
@@ -73,4 +73,32 @@ async function crearBarberia(req, res) {
   }
 }
 
-module.exports = { listarBarberias, crearBarberia };
+async function actualizarBarberia(req, res) {
+  const { id } = req.params;
+  const campos = req.body;
+
+  if (!id || !campos || Object.keys(campos).length === 0) {
+    return res.status(400).json({ error: "Faltan datos" });
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("barberias")
+      .update(campos)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("❌ Error actualizando barbería:", error);
+      return res.status(500).json({ error: "Error actualizando barbería" });
+    }
+
+    res.json({ ok: true, barberia: data });
+  } catch (err) {
+    console.error("💥 Error general actualizando barbería:", err);
+    res.status(500).json({ error: "Error interno" });
+  }
+}
+
+module.exports = { listarBarberias, crearBarberia, actualizarBarberia };

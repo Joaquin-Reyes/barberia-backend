@@ -30,7 +30,8 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
-      "mcp__plugin_everything-claude-code_playwright__browser_resize"
+      "mcp__plugin_everything-claude-code_playwright__browser_resize",
+      "Bash(xargs grep *)"
     ]
   }
 }

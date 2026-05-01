@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
 
 const API = "https://barberia-backend-production-7dae.up.railway.app";
 
@@ -58,28 +57,37 @@ async function crearBarberia() {
 }
 
   async function toggleActiva(barberia) {
-    const { error } = await supabase
-      .from("barberias")
-      .update({ activo: !barberia.activo })
-      .eq("id", barberia.id);
-    if (!error) traerBarberias();
+    const res = await fetch(`${API}/superadmin/barberias/${barberia.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-superadmin-secret": import.meta.env.VITE_SUPERADMIN_SECRET,
+      },
+      body: JSON.stringify({ activo: !barberia.activo }),
+    });
+    if (res.ok) traerBarberias();
+    else mostrarToast("Error al cambiar estado ❌", "error");
   }
 
   async function guardarWhatsapp(id) {
-    const { error } = await supabase
-      .from("barberias")
-      .update({
+    const res = await fetch(`${API}/superadmin/barberias/${id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-superadmin-secret": import.meta.env.VITE_SUPERADMIN_SECRET,
+      },
+      body: JSON.stringify({
         whatsapp_mode: whatsappForm.whatsapp_mode,
         phone_number_id: whatsappForm.phone_number_id,
         whatsapp_token: whatsappForm.whatsapp_token,
         whatsapp_number: whatsappForm.whatsapp_number,
-      })
-      .eq("id", id);
+      }),
+    });
 
-    if (!error) {
+    if (res.ok) {
       mostrarToast("WhatsApp configurado ✅");
       setConfigurando(null);
-      setWhatsappForm({ phone_number_id: "", whatsapp_token: "", whatsapp_number: "" });
+      setWhatsappForm({ whatsapp_mode: "wwebjs", phone_number_id: "", whatsapp_token: "", whatsapp_number: "" });
       traerBarberias();
     } else {
       mostrarToast("Error al guardar ❌", "error");
