@@ -211,6 +211,23 @@ async function eliminarBarbero(req, res) {
       return res.status(404).json({ error: "Barbero no encontrado" });
     }
 
+    let authUserId = barbero.usuario_id;
+
+    if (!authUserId) {
+      const { data: usersData, error: listUsersError } =
+        await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+
+      if (listUsersError) {
+        console.log("⚠️ No se pudieron listar usuarios Auth:", listUsersError.message);
+      } else {
+        const authUser = usersData?.users?.find((user) =>
+          user.user_metadata?.barbero_id === id &&
+          user.user_metadata?.barberia_id === barberia_id
+        );
+        authUserId = authUser?.id || null;
+      }
+    }
+
     await supabaseAdmin
       .from("horarios_barbero")
       .delete()
@@ -234,18 +251,18 @@ async function eliminarBarbero(req, res) {
       return res.status(500).json({ error: "Error eliminando barbero" });
     }
 
-    if (barbero.usuario_id) {
+    if (authUserId) {
       const { error: deleteUsuarioError } = await supabaseAdmin
         .from("usuarios")
         .delete()
-        .eq("id", barbero.usuario_id)
+        .eq("id", authUserId)
         .eq("barberia_id", barberia_id);
 
       if (deleteUsuarioError) {
         console.log("⚠️ Error eliminando usuario de tabla usuarios:", deleteUsuarioError.message);
       }
 
-      const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(barbero.usuario_id);
+      const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(authUserId);
 
       if (deleteAuthError) {
         console.log("⚠️ Error eliminando usuario de Auth:", deleteAuthError.message);
@@ -254,6 +271,11 @@ async function eliminarBarbero(req, res) {
           auth_warning: "Barbero eliminado, pero no se pudo eliminar el usuario de Auth",
         });
       }
+    } else {
+      return res.json({
+        ok: true,
+        auth_warning: "Barbero eliminado. No se encontró un usuario de Auth vinculado para borrar",
+      });
     }
 
     res.json({ ok: true });
