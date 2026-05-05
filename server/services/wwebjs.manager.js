@@ -1,11 +1,16 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
 const path = require('path');
 const fs = require('fs');
 
 // barberia_id → { client, qr, status }
 const clients = new Map();
+const isEnabled = () => process.env.WWEBJS_ENABLED === 'true';
 
 async function initializeAllClients() {
+  if (!isEnabled()) {
+    console.log('[wwebjs] Deshabilitado. No se inicializan clientes WhatsApp Web.');
+    return;
+  }
+
   try {
     const { supabaseAdmin } = require('../config/supabase');
 
@@ -25,6 +30,16 @@ async function initializeAllClients() {
 }
 
 function initClient(barberia_id) {
+  if (!isEnabled()) {
+    return {
+      client: null,
+      qr: null,
+      status: 'disabled',
+      readyAt: null,
+      errorMessage: 'WhatsApp Web esta deshabilitado en este servidor'
+    };
+  }
+
   if (clients.has(barberia_id)) return clients.get(barberia_id);
 
   const clientId = `barberia_${barberia_id}`;
@@ -32,6 +47,7 @@ function initClient(barberia_id) {
 
   let client;
   try {
+    const { Client, LocalAuth } = require('whatsapp-web.js');
     const puppeteerConfig = {
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     };

@@ -1,7 +1,6 @@
 const { supabaseAdmin } = require("../config/supabase");
 const { notificarBarbero, enviarTemplateConfirmacion } = require("../services/whatsapp.service");
 const { formatearHora } = require("../services/agenda.service");
-const QRCode = require("qrcode");
 const wwebjsManager = require("../services/wwebjs.manager");
 
 async function crearTurno(req, res) {
@@ -383,6 +382,13 @@ async function listarBarberos(req, res) {
 }
 
 async function getWhatsappQR(req, res) {
+  if (process.env.WWEBJS_ENABLED !== "true") {
+    return res.status(503).json({
+      status: "disabled",
+      error: "WhatsApp Web esta deshabilitado temporalmente"
+    });
+  }
+
   const barberia_id = req.user.barberia_id;
 
   const { data: barberia } = await supabaseAdmin
@@ -414,6 +420,7 @@ async function getWhatsappQR(req, res) {
   }
 
   if (entry.status === "qr_pending" && entry.qr) {
+    const QRCode = require("qrcode");
     const qrBase64 = await QRCode.toDataURL(entry.qr);
     return res.json({ status: "qr_pending", qr: qrBase64 });
   }

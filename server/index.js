@@ -88,15 +88,6 @@ app.use((req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🔥 Servidor corriendo en puerto ${PORT}`);
 
-  // TODO: remover este bloque de diagnóstico una vez confirmada la ruta de Chromium en Railway
-  const { exec } = require("child_process");
-  exec(
-    "which chromium || which chromium-browser || find /nix -name chromium 2>/dev/null | head -5",
-    (err, stdout) => {
-      console.log("[chromium-path]", stdout.trim() || "(no encontrado)");
-    }
-  );
-
   initializeAllClients().catch((err) =>
     console.error("[wwebjs] Error inicializando clientes:", err.message)
   );

@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, MessageCircle, RefreshCw } from "lucide-react";
-import { supabase, getAuthToken } from "../lib/supabase";
-
-const API = "https://barberia-backend-production-7dae.up.railway.app";
+import { supabase } from "../lib/supabase";
 
 export default function WhatsApp({ user }) {
   const [barberia, setBarberia] = useState(null);
@@ -25,40 +23,6 @@ export default function WhatsApp({ user }) {
     }
   }, []);
 
-  const consultarQR = useCallback(async () => {
-    const token = await getAuthToken();
-    if (!token) {
-      detenerPolling();
-      setWpStatus(null);
-      return;
-    }
-
-    try {
-      const res = await fetch(`${API}/admin/whatsapp/qr`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-
-      if (data.status === "authenticated") {
-        setWpStatus("authenticated");
-        setWpQR(null);
-        setWpError(null);
-        detenerPolling();
-      } else if (data.status === "qr_pending" && data.qr) {
-        setWpQR(data.qr);
-        setWpStatus("qr_pending");
-        setWpError(null);
-      } else {
-        setWpStatus(data.status || "initializing");
-        if (data.error) setWpError(data.error);
-      }
-    } catch {
-      detenerPolling();
-      setWpStatus(null);
-      mostrarToast("Error al conectar con WhatsApp", "error");
-    }
-  }, [detenerPolling, mostrarToast]);
-
   const traerBarberia = useCallback(async () => {
     const { data } = await supabase
       .from("barberias")
@@ -68,21 +32,17 @@ export default function WhatsApp({ user }) {
 
     setBarberia(data || null);
     if (data?.whatsapp_mode === "wwebjs") {
-      setWpStatus((prev) => prev ?? "loading");
-      consultarQR();
-      if (!wpPollRef.current) {
-        wpPollRef.current = setInterval(consultarQR, 3000);
-      }
+      setWpStatus("disabled");
+      detenerPolling();
     }
-  }, [barberiaId, consultarQR]);
+  }, [barberiaId, detenerPolling]);
 
   function conectarWhatsapp() {
     detenerPolling();
-    setWpStatus("loading");
+    setWpStatus("disabled");
     setWpQR(null);
-    setWpError(null);
-    consultarQR();
-    wpPollRef.current = setInterval(consultarQR, 3000);
+    setWpError("WhatsApp Web esta deshabilitado temporalmente");
+    mostrarToast("WhatsApp Web esta deshabilitado temporalmente", "error");
   }
 
   useEffect(() => {
@@ -112,6 +72,7 @@ export default function WhatsApp({ user }) {
     initializing: "Inicializando",
     disconnected: "Reconectando",
     auth_failure: "Error de autenticacion",
+    disabled: "Deshabilitado",
     error: "Error",
   }[wpStatus] || "Sin conectar";
 
@@ -185,6 +146,13 @@ export default function WhatsApp({ user }) {
             <p style={{ fontSize: 13, color: "#64748B", margin: 0 }}>
               Iniciando cliente WhatsApp, el QR aparecera automaticamente...
             </p>
+          )}
+
+          {!isCloudApi && wpStatus === "disabled" && (
+            <div style={{ padding: "10px 14px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8 }}>
+              <span style={{ fontSize: 13, color: "#92400E", display: "block", fontWeight: 500 }}>WhatsApp Web esta deshabilitado temporalmente</span>
+              <span style={{ fontSize: 12, color: "#92400E", display: "block", marginTop: 4 }}>No se generaran codigos QR ni se iniciara Chromium.</span>
+            </div>
           )}
 
           {!isCloudApi && wpStatus === "qr_pending" && wpQR && (

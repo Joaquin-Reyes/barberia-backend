@@ -10,7 +10,7 @@ export default function SuperAdminPanel({ user, onLogout }) {
   const [email, setEmail] = useState("");
   const [configurando, setConfigurando] = useState(null); // id de la barbería que se está configurando
   const [whatsappForm, setWhatsappForm] = useState({
-    whatsapp_mode: "wwebjs",
+    whatsapp_mode: "cloud_api",
     phone_number_id: "",
     whatsapp_token: "",
     whatsapp_number: "",
@@ -96,7 +96,7 @@ async function crearBarberia() {
     if (res.ok) {
       mostrarToast("WhatsApp configurado");
       setConfigurando(null);
-      setWhatsappForm({ whatsapp_mode: "wwebjs", phone_number_id: "", whatsapp_token: "", whatsapp_number: "" });
+      setWhatsappForm({ whatsapp_mode: "cloud_api", phone_number_id: "", whatsapp_token: "", whatsapp_number: "" });
       traerBarberias();
     } else {
       mostrarToast("Error al guardar", "error");
@@ -198,7 +198,7 @@ async function crearBarberia() {
                       } else {
                         setConfigurando(b.id);
                         setWhatsappForm({
-                          whatsapp_mode: b.whatsapp_mode || "wwebjs",
+                          whatsapp_mode: b.whatsapp_mode === "wwebjs" ? "cloud_api" : (b.whatsapp_mode || "cloud_api"),
                           phone_number_id: b.phone_number_id || "",
                           whatsapp_token: b.whatsapp_token || "",
                           whatsapp_number: b.whatsapp_number || "",
@@ -227,7 +227,7 @@ async function crearBarberia() {
                     onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsapp_mode: e.target.value })}
                     className="input bg-neutral-700 text-white"
                   >
-                    <option value="wwebjs">QR (whatsapp-web.js)</option>
+                    <option value="wwebjs" disabled>QR (whatsapp-web.js) - deshabilitado</option>
                     <option value="cloud_api">Cloud API (Meta)</option>
                   </select>
                   <input

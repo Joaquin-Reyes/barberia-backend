@@ -5,6 +5,7 @@ const { supabaseAdmin } = require("../config/supabase");
 // Contexto por invocación: { barberia_id, mode }
 // Usado por enviarMensaje para saber qué transporte usar sin cambiar sus call sites.
 const asyncLocalStorage = new AsyncLocalStorage();
+const isWwebjsEnabled = () => process.env.WWEBJS_ENABLED === "true";
 
 async function _obtenerModo(barberia_id) {
   const { data } = await supabaseAdmin
@@ -26,6 +27,11 @@ async function enviarMensaje(numero, mensaje, phone_number_id) {
   const ctx = asyncLocalStorage.getStore();
 
   if (ctx?.mode === "wwebjs") {
+    if (!isWwebjsEnabled()) {
+      console.warn("[wwebjs] WhatsApp Web deshabilitado, mensaje no enviado");
+      return;
+    }
+
     const { getClient } = require("./wwebjs.manager");
     const entry = getClient(ctx.barberia_id);
     if (entry?.status === "authenticated") {
@@ -72,6 +78,11 @@ async function enviarTemplateConfirmacion({ telefono, nombre, servicio, barbero,
   const mode = barberia_id ? await _obtenerModo(barberia_id) : "cloud_api";
 
   if (mode === "wwebjs") {
+    if (!isWwebjsEnabled()) {
+      console.warn(`[wwebjs] WhatsApp Web deshabilitado para barberia ${barberia_id}, confirmacion no enviada`);
+      return;
+    }
+
     const { getClient } = require("./wwebjs.manager");
     const entry = getClient(barberia_id);
     if (entry?.status === "authenticated") {
@@ -149,6 +160,11 @@ async function notificarBarbero(datos) {
   console.log(`[notificarBarbero] modo detectado="${mode}" phone_number_id="${barberia?.phone_number_id}"`);
 
   if (mode === "wwebjs") {
+    if (!isWwebjsEnabled()) {
+      console.warn(`[notificarBarbero] WhatsApp Web deshabilitado para barberia ${datos.barberia_id}, notificacion no enviada`);
+      return;
+    }
+
     try {
       const { getClient } = require("./wwebjs.manager");
       const entry = getClient(datos.barberia_id);

@@ -3,6 +3,7 @@ const { mensajeYaProcesado, guardarMensajeProcesado } = require("../services/ded
 const { procesarMensaje } = require("../services/bot.service");
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
+const CHATBOT_ENABLED = process.env.CHATBOT_ENABLED === "true";
 
 function verify(req, res) {
   const mode = req.query["hub.mode"];
@@ -19,6 +20,11 @@ function verify(req, res) {
 
 async function handleMessage(req, res) {
   res.sendStatus(200);
+
+  if (!CHATBOT_ENABLED) {
+    console.log("[whatsapp] Chatbot desactivado; webhook recibido sin respuesta automatica.");
+    return;
+  }
 
   try {
     const entry = req.body.entry?.[0];
