@@ -4,6 +4,7 @@ const fs = require('fs');
 // barberia_id → { client, qr, status }
 const clients = new Map();
 const isEnabled = () => process.env.WHATSAPP_ENABLED === 'true' && process.env.WWEBJS_ENABLED === 'true';
+const shouldAutoReconnect = () => process.env.WWEBJS_AUTO_RECONNECT === 'true';
 
 async function initializeAllClients() {
   if (!isEnabled()) {
@@ -86,9 +87,10 @@ function initClient(barberia_id) {
 
   client.on('auth_failure', () => {
     entry.status = 'auth_failure';
-    console.error(`[wwebjs] Auth failure para barberia ${barberia_id}. Reconectando en 10s...`);
+    console.error(`[wwebjs] Auth failure para barberia ${barberia_id}.`);
     try { client.destroy(); } catch (_) {}
     clients.delete(barberia_id);
+    if (!shouldAutoReconnect()) return;
     setTimeout(() => {
       console.log(`[wwebjs] Reconectando tras auth_failure barberia ${barberia_id}...`);
       initClient(barberia_id);
@@ -97,16 +99,31 @@ function initClient(barberia_id) {
 
   client.on('disconnected', (reason) => {
     entry.status = 'disconnected';
-    console.log(`[wwebjs] Desconectado para barberia ${barberia_id}: ${reason}. Reconectando en 5s...`);
+    console.log(`[wwebjs] Desconectado para barberia ${barberia_id}: ${reason}.`);
     try { client.destroy(); } catch (_) {}
     clients.delete(barberia_id);
+    if (!shouldAutoReconnect()) return;
     setTimeout(() => {
       console.log(`[wwebjs] Reconectando barberia ${barberia_id}...`);
       initClient(barberia_id);
     }, 5000);
   });
 
-  // TODO: habilitar bot para wwebjs cuando se requiera
+  client.on('message', async (message) => {
+    if (process.env.WHATSAPP_RECEPCION_PILOT_ENABLED !== 'true') return;
+    if (!message?.body || message.fromMe) return;
+
+    try {
+      const { procesarRecepcionWhatsapp } = require('./recepcion_whatsapp.service');
+      await procesarRecepcionWhatsapp({
+        barberia_id,
+        from: message.from,
+        text: message.body
+      });
+    } catch (err) {
+      console.error(`[wwebjs] Error procesando recepcion barberia ${barberia_id}:`, err.message);
+    }
+  });
 
   // Eliminar lock files de Chromium que quedan de procesos anteriores
   const profilePath = path.join(dataPath, `session-${clientId}`);
@@ -120,6 +137,7 @@ function initClient(barberia_id) {
     entry.status = 'error';
     entry.errorMessage = err.message;
     clients.delete(barberia_id);
+    if (!shouldAutoReconnect()) return;
     setTimeout(() => {
       console.log(`[wwebjs] Reintentando init barberia ${barberia_id}...`);
       initClient(barberia_id);

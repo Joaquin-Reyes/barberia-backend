@@ -9,6 +9,7 @@ import Barberos from './pages/Barberos'
 import Facturacion from './pages/Facturacion'
 import Configuracion from './pages/Configuracion'
 import WhatsApp from './pages/WhatsApp'
+import SolicitudesWhatsApp from './pages/SolicitudesWhatsApp'
 import Cola from './pages/Cola'
 import PanelBarbero from './pages/PanelBarbero'
 import { supabase } from './lib/supabase'
@@ -110,6 +111,7 @@ function App() {
           <Route path="barberos" element={<Barberos user={user} />} />
           <Route path="facturacion" element={<Facturacion user={user} />} />
           <Route path="whatsapp" element={<WhatsApp user={user} />} />
+          <Route path="solicitudes-whatsapp" element={<SolicitudesWhatsApp user={user} />} />
           <Route path="configuracion" element={<Configuracion user={user} />} />
           {user.rol !== 'barbero' && (
             <Route path="cola" element={<Cola user={user} />} />

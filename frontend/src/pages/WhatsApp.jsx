@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, MessageCircle, RefreshCw } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import { getAuthToken, supabase } from "../lib/supabase";
+
+const API = "https://barberia-backend-production-7dae.up.railway.app";
 
 export default function WhatsApp({ user }) {
   const [barberia, setBarberia] = useState(null);
@@ -9,6 +11,7 @@ export default function WhatsApp({ user }) {
   const [wpError, setWpError] = useState(null);
   const [toast, setToast] = useState(null);
   const wpPollRef = useRef(null);
+  const wpPollAttemptsRef = useRef(0);
   const barberiaId = user?.barberia_id;
 
   const mostrarToast = useCallback((mensaje, tipo = "success") => {
@@ -21,7 +24,34 @@ export default function WhatsApp({ user }) {
       clearInterval(wpPollRef.current);
       wpPollRef.current = null;
     }
+    wpPollAttemptsRef.current = 0;
   }, []);
+
+  const consultarEstadoWhatsapp = useCallback(async () => {
+    try {
+      wpPollAttemptsRef.current += 1;
+      const token = await getAuthToken();
+      const res = await fetch(`${API}/admin/whatsapp/qr`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+
+      setWpStatus(data.status || "error");
+      setWpQR(data.qr || null);
+      setWpError(data.error || null);
+
+      if (data.status === "authenticated" || data.status === "disabled" || data.status === "error") {
+        detenerPolling();
+      } else if (wpPollAttemptsRef.current >= 12) {
+        setWpError("Tiempo de conexion agotado. Volve a tocar conectar para generar otro intento.");
+        detenerPolling();
+      }
+    } catch (error) {
+      setWpStatus("error");
+      setWpError(error.message || "No se pudo consultar WhatsApp");
+      detenerPolling();
+    }
+  }, [detenerPolling]);
 
   const traerBarberia = useCallback(async () => {
     const { data } = await supabase
@@ -32,17 +62,19 @@ export default function WhatsApp({ user }) {
 
     setBarberia(data || null);
     if (data?.whatsapp_mode === "wwebjs") {
-      setWpStatus("disabled");
+      setWpStatus(null);
       detenerPolling();
     }
   }, [barberiaId, detenerPolling]);
 
   function conectarWhatsapp() {
     detenerPolling();
-    setWpStatus("disabled");
+    wpPollAttemptsRef.current = 0;
+    setWpStatus("loading");
     setWpQR(null);
-    setWpError("WhatsApp Web esta deshabilitado temporalmente");
-    mostrarToast("WhatsApp Web esta deshabilitado temporalmente", "error");
+    setWpError(null);
+    consultarEstadoWhatsapp();
+    wpPollRef.current = setInterval(consultarEstadoWhatsapp, 10000);
   }
 
   useEffect(() => {

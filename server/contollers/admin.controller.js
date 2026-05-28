@@ -428,6 +428,64 @@ async function getWhatsappQR(req, res) {
   return res.json({ status: entry.status });
 }
 
+async function listarSolicitudesWhatsapp(req, res) {
+  const barberia_id = req.user.barberia_id;
+  const estado = req.query.estado;
+
+  let query = supabaseAdmin
+    .from("solicitudes_whatsapp")
+    .select("*")
+    .eq("barberia_id", barberia_id)
+    .order("created_at", { ascending: false });
+
+  if (estado && estado !== "todas") {
+    query = query.eq("estado", estado);
+  }
+
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: "No se pudieron listar solicitudes" });
+  res.json(data || []);
+}
+
+async function actualizarSolicitudWhatsapp(req, res) {
+  const barberia_id = req.user.barberia_id;
+  const { id } = req.params;
+  const camposPermitidos = [
+    "nombre",
+    "servicio",
+    "profesional",
+    "fecha_preferida",
+    "hora_preferida",
+    "notas",
+    "estado",
+    "requiere_humano"
+  ];
+
+  const cambios = {};
+  for (const campo of camposPermitidos) {
+    if (Object.prototype.hasOwnProperty.call(req.body, campo)) {
+      cambios[campo] = req.body[campo];
+    }
+  }
+
+  if (cambios.estado && !["pendiente", "en_revision", "resuelta", "descartada"].includes(cambios.estado)) {
+    return res.status(400).json({ error: "Estado invalido" });
+  }
+
+  cambios.updated_at = new Date().toISOString();
+
+  const { data, error } = await supabaseAdmin
+    .from("solicitudes_whatsapp")
+    .update(cambios)
+    .eq("id", id)
+    .eq("barberia_id", barberia_id)
+    .select("*")
+    .single();
+
+  if (error) return res.status(500).json({ error: "No se pudo actualizar la solicitud" });
+  res.json(data);
+}
+
 module.exports = {
   crearTurno,
   listarTurnos,
@@ -437,5 +495,7 @@ module.exports = {
   listarBarberos,
   eliminarBarbero,
   reenviarInvitacion,
-  getWhatsappQR
+  getWhatsappQR,
+  listarSolicitudesWhatsapp,
+  actualizarSolicitudWhatsapp
 };

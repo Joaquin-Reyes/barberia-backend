@@ -11,7 +11,9 @@ const {
   listarBarberos,
   eliminarBarbero,
   reenviarInvitacion,
-  getWhatsappQR
+  getWhatsappQR,
+  listarSolicitudesWhatsapp,
+  actualizarSolicitudWhatsapp
 } = require("../contollers/admin.controller");
 
 // 🔐 Proteger panel barbero (antes de la protección general)
@@ -27,12 +29,15 @@ router.get("/barberos", authMiddleware, listarBarberos);
 router.delete("/barberos/:id", authMiddleware, eliminarBarbero);
 router.post("/barberos/:id/reenviar-invitacion", authMiddleware, reenviarInvitacion);
 router.get("/whatsapp/qr", authMiddleware, getWhatsappQR);
+router.get("/solicitudes-whatsapp", authMiddleware, listarSolicitudesWhatsapp);
+router.put("/solicitudes-whatsapp/:id", authMiddleware, actualizarSolicitudWhatsapp);
 
 // 🔐 Proteger panel HTML (deja pasar las APIs)
 router.use("/", (req, res, next) => {
   if (req.path.startsWith("/barberos")) return next();
   if (req.path.startsWith("/crear-turno")) return next();
   if (req.path.startsWith("/turnos")) return next();
+  if (req.path.startsWith("/solicitudes-whatsapp")) return next();
   if (req.path === "/barbero.html") return next();
   if (req.session.auth) return next();
   return res.sendFile(path.join(__dirname, "../admin/login.html"));
