@@ -53,6 +53,28 @@ export default function WhatsApp({ user }) {
     }
   }, [detenerPolling]);
 
+  const consultarEstadoLiviano = useCallback(async () => {
+    try {
+      const token = await getAuthToken();
+      const res = await fetch(`${API}/admin/whatsapp/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo consultar el estado");
+
+      if (data.status === "authenticated" || data.status === "disconnected" || data.status === "auth_failure" || data.status === "error") {
+        setWpStatus(data.status);
+        setWpError(data.error || null);
+      } else {
+        setWpStatus(null);
+        setWpError(null);
+      }
+    } catch (error) {
+      setWpStatus(null);
+      setWpError(error.message || null);
+    }
+  }, []);
+
   const traerBarberia = useCallback(async () => {
     const { data } = await supabase
       .from("barberias")
@@ -64,8 +86,9 @@ export default function WhatsApp({ user }) {
     if (data?.whatsapp_mode === "wwebjs") {
       setWpStatus(null);
       detenerPolling();
+      consultarEstadoLiviano();
     }
-  }, [barberiaId, detenerPolling]);
+  }, [barberiaId, consultarEstadoLiviano, detenerPolling]);
 
   function conectarWhatsapp() {
     detenerPolling();

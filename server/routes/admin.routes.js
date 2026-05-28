@@ -12,6 +12,7 @@ const {
   eliminarBarbero,
   reenviarInvitacion,
   getWhatsappQR,
+  getWhatsappStatus,
   listarSolicitudesWhatsapp,
   actualizarSolicitudWhatsapp
 } = require("../contollers/admin.controller");
@@ -28,6 +29,7 @@ router.post("/barberos", authMiddleware, crearBarbero);
 router.get("/barberos", authMiddleware, listarBarberos);
 router.delete("/barberos/:id", authMiddleware, eliminarBarbero);
 router.post("/barberos/:id/reenviar-invitacion", authMiddleware, reenviarInvitacion);
+router.get("/whatsapp/status", authMiddleware, getWhatsappStatus);
 router.get("/whatsapp/qr", authMiddleware, getWhatsappQR);
 router.get("/solicitudes-whatsapp", authMiddleware, listarSolicitudesWhatsapp);
 router.put("/solicitudes-whatsapp/:id", authMiddleware, actualizarSolicitudWhatsapp);

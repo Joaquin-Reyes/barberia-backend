@@ -428,6 +428,38 @@ async function getWhatsappQR(req, res) {
   return res.json({ status: entry.status });
 }
 
+async function getWhatsappStatus(req, res) {
+  if (process.env.WHATSAPP_ENABLED !== "true" || process.env.WWEBJS_ENABLED !== "true") {
+    return res.json({
+      status: "disabled",
+      error: "WhatsApp Web esta deshabilitado temporalmente"
+    });
+  }
+
+  const barberia_id = req.user.barberia_id;
+
+  const { data: barberia } = await supabaseAdmin
+    .from("barberias")
+    .select("whatsapp_mode")
+    .eq("id", barberia_id)
+    .single();
+
+  if (!barberia || barberia.whatsapp_mode !== "wwebjs") {
+    return res.json({ status: "cloud_api" });
+  }
+
+  const entry = wwebjsManager.getClient(barberia_id);
+  if (!entry) {
+    return res.json({ status: "not_started" });
+  }
+
+  return res.json({
+    status: entry.status,
+    readyAt: entry.readyAt || null,
+    error: entry.errorMessage || null
+  });
+}
+
 async function listarSolicitudesWhatsapp(req, res) {
   const barberia_id = req.user.barberia_id;
   const estado = req.query.estado;
@@ -496,6 +528,7 @@ module.exports = {
   eliminarBarbero,
   reenviarInvitacion,
   getWhatsappQR,
+  getWhatsappStatus,
   listarSolicitudesWhatsapp,
   actualizarSolicitudWhatsapp
 };
