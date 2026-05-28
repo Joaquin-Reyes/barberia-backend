@@ -112,6 +112,7 @@ function initClient(barberia_id) {
   client.on('message', async (message) => {
     if (process.env.WHATSAPP_RECEPCION_PILOT_ENABLED !== 'true') return;
     if (!message?.body || message.fromMe) return;
+    if (!message.from || !message.from.endsWith('@c.us')) return;
 
     try {
       const { procesarRecepcionWhatsapp } = require('./recepcion_whatsapp.service');

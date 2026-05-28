@@ -39,3 +39,7 @@ CREATE INDEX IF NOT EXISTS solicitudes_whatsapp_barberia_estado_idx
 
 CREATE INDEX IF NOT EXISTS solicitudes_whatsapp_telefono_idx
   ON solicitudes_whatsapp (barberia_id, telefono);
+
+CREATE UNIQUE INDEX IF NOT EXISTS solicitudes_whatsapp_activa_por_telefono_idx
+  ON solicitudes_whatsapp (barberia_id, telefono)
+  WHERE estado IN ('pendiente', 'en_revision') AND telefono <> '';

@@ -15,6 +15,24 @@ function normalizarTexto(texto) {
     .trim();
 }
 
+function tieneIntencionTurno(texto) {
+  const normalizado = normalizarTexto(texto);
+  return [
+    "turno",
+    "cita",
+    "reserv",
+    "horario",
+    "agenda",
+    "atender",
+    "corte",
+    "barba",
+    "pestana",
+    "lifting",
+    "unas",
+    "cejas"
+  ].some((clave) => normalizado.includes(clave));
+}
+
 function crearSesion() {
   return {
     nombre: null,
@@ -158,16 +176,41 @@ async function guardarSolicitud({ barberia_id, telefono, sesion }) {
     .insert(payload)
     .select("id")
     .single();
+  if (error?.code === "23505") {
+    const { data: repetida } = await supabaseAdmin
+      .from("solicitudes_whatsapp")
+      .select("id")
+      .eq("barberia_id", barberia_id)
+      .eq("telefono", telefono)
+      .in("estado", ["pendiente", "en_revision"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (repetida?.id) {
+      await supabaseAdmin
+        .from("solicitudes_whatsapp")
+        .update(payload)
+        .eq("id", repetida.id);
+      return repetida.id;
+    }
+  }
   if (error) throw error;
   return data.id;
 }
 
 async function procesarRecepcionWhatsapp({ barberia_id, from, text }) {
   const telefono = limpiarTelefono(from);
+  if (!telefono) return { ignored: true, reason: "telefono_vacio" };
+
   const userKey = `${barberia_id}_${telefono}`;
   const barberia = await obtenerDatosBarberia(barberia_id);
   const sesion = sesiones.get(userKey) || crearSesion();
   const mensaje = String(text || "").trim();
+
+  if (sesion.estado === "inicio" && !tieneIntencionTurno(mensaje)) {
+    return { ignored: true, reason: "sin_intencion_turno" };
+  }
 
   sesion.mensajes.push({
     from: "cliente",
