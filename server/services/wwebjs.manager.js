@@ -110,17 +110,34 @@ function initClient(barberia_id) {
   });
 
   client.on('message', async (message) => {
-    if (process.env.WHATSAPP_RECEPCION_PILOT_ENABLED !== 'true') return;
-    if (!message?.body || message.fromMe) return;
-    if (!message.from || !message.from.endsWith('@c.us')) return;
+    const preview = String(message?.body || '').slice(0, 80);
+    console.log(`[wwebjs] mensaje recibido barberia=${barberia_id} from=${message?.from || 'sin_from'} fromMe=${Boolean(message?.fromMe)} body="${preview}"`);
+
+    if (process.env.WHATSAPP_RECEPCION_PILOT_ENABLED !== 'true') {
+      console.log('[wwebjs] recepcion piloto desactivada por env WHATSAPP_RECEPCION_PILOT_ENABLED');
+      return;
+    }
+    if (!message?.body || message.fromMe) {
+      console.log('[wwebjs] mensaje ignorado: vacio o enviado desde el propio numero');
+      return;
+    }
+    if (!message.from || !message.from.endsWith('@c.us')) {
+      console.log('[wwebjs] mensaje ignorado: no es chat individual');
+      return;
+    }
 
     try {
       const { procesarRecepcionWhatsapp } = require('./recepcion_whatsapp.service');
-      await procesarRecepcionWhatsapp({
+      const resultado = await procesarRecepcionWhatsapp({
         barberia_id,
         from: message.from,
         text: message.body
       });
+      if (resultado?.ignored) {
+        console.log(`[wwebjs] recepcion ignorada: ${resultado.reason}`);
+      } else {
+        console.log(`[wwebjs] recepcion procesada completed=${Boolean(resultado?.completed)}`);
+      }
     } catch (err) {
       console.error(`[wwebjs] Error procesando recepcion barberia ${barberia_id}:`, err.message);
     }

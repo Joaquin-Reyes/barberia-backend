@@ -456,7 +456,8 @@ async function getWhatsappStatus(req, res) {
   return res.json({
     status: entry.status,
     readyAt: entry.readyAt || null,
-    error: entry.errorMessage || null
+    error: entry.errorMessage || null,
+    recepcionPilotEnabled: process.env.WHATSAPP_RECEPCION_PILOT_ENABLED === "true"
   });
 }
 
