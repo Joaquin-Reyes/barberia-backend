@@ -476,8 +476,13 @@ async function getWhatsappChats(req, res) {
   try {
     const limit = Math.min(Number(req.query.limit) || 10, 25);
     const chats = await entry.client.getChats();
-    const recientes = chats
-      .filter((chat) => !chat.isGroup && chat.id?._serialized?.endsWith("@c.us"))
+    const directos = chats.filter((chat) =>
+      !chat.isGroup &&
+      chat.id?._serialized?.endsWith("@c.us") &&
+      chat.id._serialized !== "0@c.us"
+    );
+
+    const recientes = directos
       .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
       .slice(0, limit)
       .map((chat) => ({
@@ -489,7 +494,13 @@ async function getWhatsappChats(req, res) {
         ultimoMensajeFromMe: Boolean(chat.lastMessage?.fromMe)
       }));
 
-    res.json({ status: entry.status, chats: recientes });
+    res.json({
+      status: entry.status,
+      totalChats: chats.length,
+      totalDirectos: directos.length,
+      totalGrupos: chats.filter((chat) => chat.isGroup).length,
+      chats: recientes
+    });
   } catch (error) {
     res.status(500).json({ error: error.message || "No se pudieron listar chats" });
   }
