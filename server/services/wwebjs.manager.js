@@ -109,7 +109,8 @@ function initClient(barberia_id) {
     }, 5000);
   });
 
-  client.on('message', async (message) => {
+  const processedMessages = new Set();
+  async function handleIncomingMessage(message, eventName) {
     if (process.env.WHATSAPP_RECEPCION_PILOT_ENABLED !== 'true') {
       console.log('[wwebjs] recepcion piloto desactivada por env WHATSAPP_RECEPCION_PILOT_ENABLED');
       return;
@@ -117,8 +118,13 @@ function initClient(barberia_id) {
     if (!message?.body || message.fromMe) return;
     if (!message.from || !message.from.endsWith('@c.us')) return;
 
+    const messageId = message.id?._serialized || `${message.from}:${message.timestamp}:${message.body}`;
+    if (processedMessages.has(messageId)) return;
+    processedMessages.add(messageId);
+    setTimeout(() => processedMessages.delete(messageId), 10 * 60 * 1000);
+
     const preview = String(message.body).slice(0, 80);
-    console.log(`[wwebjs] mensaje directo recibido barberia=${barberia_id} from=${message.from} body="${preview}"`);
+    console.log(`[wwebjs] mensaje directo recibido event=${eventName} barberia=${barberia_id} from=${message.from} body="${preview}"`);
 
     try {
       const { procesarRecepcionWhatsapp } = require('./recepcion_whatsapp.service');
@@ -135,6 +141,14 @@ function initClient(barberia_id) {
     } catch (err) {
       console.error(`[wwebjs] Error procesando recepcion barberia ${barberia_id}:`, err.message);
     }
+  }
+
+  client.on('message', (message) => {
+    handleIncomingMessage(message, 'message');
+  });
+
+  client.on('message_create', (message) => {
+    handleIncomingMessage(message, 'message_create');
   });
 
   // Eliminar lock files de Chromium que quedan de procesos anteriores
