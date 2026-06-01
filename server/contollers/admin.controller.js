@@ -3,6 +3,15 @@ const { notificarBarbero, enviarTemplateConfirmacion } = require("../services/wh
 const { formatearHora } = require("../services/agenda.service");
 const wwebjsManager = require("../services/wwebjs.manager");
 
+function isWhatsappDirectChatId(chatId) {
+  if (!chatId) return false;
+  if (chatId === "status@broadcast") return false;
+  if (chatId === "0@c.us") return false;
+  if (chatId.endsWith("@g.us")) return false;
+  if (chatId.includes("broadcast")) return false;
+  return chatId.includes("@");
+}
+
 async function crearTurno(req, res) {
   const { nombre, telefono, servicio, precio, barbero, fecha, hora } = req.body;
 
@@ -476,11 +485,7 @@ async function getWhatsappChats(req, res) {
   try {
     const limit = Math.min(Number(req.query.limit) || 10, 25);
     const chats = await entry.client.getChats();
-    const directos = chats.filter((chat) =>
-      !chat.isGroup &&
-      chat.id?._serialized?.endsWith("@c.us") &&
-      chat.id._serialized !== "0@c.us"
-    );
+    const directos = chats.filter((chat) => !chat.isGroup && isWhatsappDirectChatId(chat.id?._serialized));
 
     const recientes = directos
       .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
@@ -499,6 +504,12 @@ async function getWhatsappChats(req, res) {
       totalChats: chats.length,
       totalDirectos: directos.length,
       totalGrupos: chats.filter((chat) => chat.isGroup).length,
+      tipos: chats.reduce((acc, chat) => {
+        const id = chat.id?._serialized || "sin_id";
+        const tipo = id.includes("@") ? id.split("@").pop() : "sin_tipo";
+        acc[tipo] = (acc[tipo] || 0) + 1;
+        return acc;
+      }, {}),
       chats: recientes
     });
   } catch (error) {

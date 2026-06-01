@@ -7,6 +7,11 @@ function limpiarTelefono(valor) {
   return String(valor || "").replace("@c.us", "").replace(/\D/g, "");
 }
 
+function resolverDestinoWhatsapp(valor) {
+  const texto = String(valor || "");
+  return texto.includes("@") ? texto : limpiarTelefono(texto);
+}
+
 function normalizarTexto(texto) {
   return String(texto || "")
     .toLowerCase()
@@ -238,8 +243,9 @@ async function procesarRecepcionWhatsapp({ barberia_id, from, text }) {
   sesiones.set(userKey, sesion);
 
   return asyncLocalStorage.run({ barberia_id, mode: "wwebjs" }, async () => {
+    const destino = resolverDestinoWhatsapp(from);
     if (pregunta) {
-      await enviarMensaje(telefono, pregunta);
+      await enviarMensaje(destino, pregunta);
       return { completed: false };
     }
 
@@ -248,7 +254,7 @@ async function procesarRecepcionWhatsapp({ barberia_id, from, text }) {
     sesiones.set(userKey, sesion);
 
     await enviarMensaje(
-      telefono,
+      destino,
       `Perfecto ${sesion.nombre}. Dejo tu solicitud preparada:\n\n${resumenSolicitud(sesion)}\n\nUna persona del local revisa disponibilidad y te confirma el turno.`
     );
 

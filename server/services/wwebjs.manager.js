@@ -6,6 +6,15 @@ const clients = new Map();
 const isEnabled = () => process.env.WHATSAPP_ENABLED === 'true' && process.env.WWEBJS_ENABLED === 'true';
 const shouldAutoReconnect = () => process.env.WWEBJS_AUTO_RECONNECT === 'true';
 
+function isDirectChatId(chatId) {
+  if (!chatId) return false;
+  if (chatId === 'status@broadcast') return false;
+  if (chatId === '0@c.us') return false;
+  if (chatId.endsWith('@g.us')) return false;
+  if (chatId.includes('broadcast')) return false;
+  return chatId.includes('@');
+}
+
 async function initializeAllClients() {
   if (!isEnabled()) {
     console.log('[wwebjs] Deshabilitado. No se inicializan clientes WhatsApp Web.');
@@ -116,7 +125,7 @@ function initClient(barberia_id) {
       return;
     }
     if (!message?.body || message.fromMe) return;
-    if (!message.from || !message.from.endsWith('@c.us')) return;
+    if (!isDirectChatId(message.from)) return;
 
     const messageId = message.id?._serialized || `${message.from}:${message.timestamp}:${message.body}`;
     if (processedMessages.has(messageId)) return;

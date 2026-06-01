@@ -18,6 +18,7 @@ async function _obtenerModo(barberia_id) {
 }
 
 async function _resolverChatId(client, numero) {
+  if (String(numero).includes("@")) return String(numero);
   const numLimpio = String(numero).replace("@c.us", "").replace(/\D/g, "");
   const numberId = await client.getNumberId(numLimpio);
   if (!numberId) throw new Error(`Número no registrado en WhatsApp: ${numLimpio}`);
