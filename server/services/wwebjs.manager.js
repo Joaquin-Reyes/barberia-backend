@@ -110,21 +110,15 @@ function initClient(barberia_id) {
   });
 
   client.on('message', async (message) => {
-    const preview = String(message?.body || '').slice(0, 80);
-    console.log(`[wwebjs] mensaje recibido barberia=${barberia_id} from=${message?.from || 'sin_from'} fromMe=${Boolean(message?.fromMe)} body="${preview}"`);
-
     if (process.env.WHATSAPP_RECEPCION_PILOT_ENABLED !== 'true') {
       console.log('[wwebjs] recepcion piloto desactivada por env WHATSAPP_RECEPCION_PILOT_ENABLED');
       return;
     }
-    if (!message?.body || message.fromMe) {
-      console.log('[wwebjs] mensaje ignorado: vacio o enviado desde el propio numero');
-      return;
-    }
-    if (!message.from || !message.from.endsWith('@c.us')) {
-      console.log('[wwebjs] mensaje ignorado: no es chat individual');
-      return;
-    }
+    if (!message?.body || message.fromMe) return;
+    if (!message.from || !message.from.endsWith('@c.us')) return;
+
+    const preview = String(message.body).slice(0, 80);
+    console.log(`[wwebjs] mensaje directo recibido barberia=${barberia_id} from=${message.from} body="${preview}"`);
 
     try {
       const { procesarRecepcionWhatsapp } = require('./recepcion_whatsapp.service');
