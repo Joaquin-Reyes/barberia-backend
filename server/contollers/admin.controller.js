@@ -461,6 +461,40 @@ async function getWhatsappStatus(req, res) {
   });
 }
 
+async function getWhatsappChats(req, res) {
+  if (process.env.WHATSAPP_ENABLED !== "true" || process.env.WWEBJS_ENABLED !== "true") {
+    return res.status(503).json({ error: "WhatsApp Web esta deshabilitado" });
+  }
+
+  const barberia_id = req.user.barberia_id;
+  const entry = wwebjsManager.getClient(barberia_id);
+
+  if (!entry || entry.status !== "authenticated") {
+    return res.status(409).json({ error: "WhatsApp no esta conectado", status: entry?.status || "not_started" });
+  }
+
+  try {
+    const limit = Math.min(Number(req.query.limit) || 10, 25);
+    const chats = await entry.client.getChats();
+    const recientes = chats
+      .filter((chat) => !chat.isGroup && chat.id?._serialized?.endsWith("@c.us"))
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+      .slice(0, limit)
+      .map((chat) => ({
+        id: chat.id?._serialized || null,
+        nombre: chat.name || chat.formattedTitle || null,
+        timestamp: chat.timestamp || null,
+        unreadCount: chat.unreadCount || 0,
+        ultimoMensaje: chat.lastMessage?.body || null,
+        ultimoMensajeFromMe: Boolean(chat.lastMessage?.fromMe)
+      }));
+
+    res.json({ status: entry.status, chats: recientes });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "No se pudieron listar chats" });
+  }
+}
+
 async function listarSolicitudesWhatsapp(req, res) {
   const barberia_id = req.user.barberia_id;
   const estado = req.query.estado;
@@ -530,6 +564,7 @@ module.exports = {
   reenviarInvitacion,
   getWhatsappQR,
   getWhatsappStatus,
+  getWhatsappChats,
   listarSolicitudesWhatsapp,
   actualizarSolicitudWhatsapp
 };

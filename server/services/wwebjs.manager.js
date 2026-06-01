@@ -82,7 +82,7 @@ function initClient(barberia_id) {
     entry.status = 'authenticated';
     entry.qr = null;
     entry.readyAt = Math.floor(Date.now() / 1000);
-    console.log(`[wwebjs] Cliente listo para barberia ${barberia_id}`);
+    console.log(`[wwebjs] Cliente listo para barberia ${barberia_id} | recepcion=${process.env.WHATSAPP_RECEPCION_PILOT_ENABLED === 'true' ? 'on' : 'off'}`);
   });
 
   client.on('auth_failure', () => {
