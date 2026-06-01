@@ -258,6 +258,7 @@ async function procesarRecepcionWhatsapp({ barberia_id, from, text }) {
       `Perfecto ${sesion.nombre}. Dejo tu solicitud preparada:\n\n${resumenSolicitud(sesion)}\n\nUna persona del local revisa disponibilidad y te confirma el turno.`
     );
 
+    sesiones.delete(userKey);
     return { completed: true };
   });
 }
