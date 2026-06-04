@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Building2, Plus, Scissors, CheckCircle2, X, Pencil } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 export default function Configuracion({ user }) {
+  const barberiaId = user?.barberia_id;
   const [servicios, setServicios] = useState([]);
   const [nuevoServicio, setNuevoServicio] = useState({ nombre: "", precio: "" });
   const [editandoServicio, setEditandoServicio] = useState(null); // { id, nombre, precio }
@@ -10,26 +11,28 @@ export default function Configuracion({ user }) {
   const [editando, setEditando] = useState(false);
   const [toast, setToast] = useState(null);
 
-  useEffect(() => {
-    if (!user) return;
-    traerServicios();
-    traerBarberia();
-  }, [user]);
-
-  async function traerServicios() {
+  const traerServicios = useCallback(async () => {
     const { data } = await supabase
       .from("servicios").select("*")
-      .eq("barberia_id", user.barberia_id);
+      .eq("barberia_id", barberiaId);
     setServicios(data || []);
-  }
+  }, [barberiaId]);
 
-  async function traerBarberia() {
+  const traerBarberia = useCallback(async () => {
     const { data } = await supabase
       .from("barberias").select("*")
-      .eq("id", user.barberia_id)
+      .eq("id", barberiaId)
       .single();
     setBarberia(data || null);
-  }
+  }, [barberiaId]);
+
+  useEffect(() => {
+    if (!user) return;
+    async function cargarDatos() {
+      await Promise.all([traerServicios(), traerBarberia()]);
+    }
+    cargarDatos();
+  }, [traerBarberia, traerServicios, user]);
 
   const mostrarToast = (mensaje, tipo = "success") => {
     setToast({ mensaje, tipo });
@@ -199,7 +202,7 @@ export default function Configuracion({ user }) {
                 </tr>
                 {/* WhatsApp */}
                 <tr style={rowBorder}>
-                  <td style={labelStyle}>WhatsApp número</td>
+                  <td style={labelStyle}>Número de WhatsApp</td>
                   <td style={valueStyle}>
                     {editando ? (
                       <input
@@ -375,6 +378,7 @@ export default function Configuracion({ user }) {
                             </button>
                             <button
                               onClick={async () => {
+                                if (!window.confirm(`¿Eliminar el servicio "${s.nombre}"?`)) return;
                                 await supabase.from("servicios").delete().eq("id", s.id);
                                 traerServicios();
                                 mostrarToast("Servicio eliminado");

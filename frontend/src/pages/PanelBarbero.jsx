@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase, getAuthToken } from "../lib/supabase";
 
 const API = "https://barberia-backend-production-7dae.up.railway.app";
@@ -22,7 +22,12 @@ export default function PanelBarbero({ user }) {
   const [servicioCola, setServicioCola] = useState("");
   const [precioCola, setPrecioCola] = useState("");
 
-  async function cargarDatos() {
+  const mostrarToast = useCallback((mensaje, tipo = "success") => {
+    setToast({ mensaje, tipo });
+    setTimeout(() => setToast(null), 3000);
+  }, []);
+
+  const cargarDatos = useCallback(async () => {
     const token = await getAuthToken();
     try {
       const [colaRes, turnosRes] = await Promise.all([
@@ -89,7 +94,7 @@ export default function PanelBarbero({ user }) {
     } finally {
       setCargando(false);
     }
-  }
+  }, [mostrarToast, user?.barberia_id]);
 
   useEffect(() => {
     if (!user?.barberia_id) return;
@@ -120,7 +125,7 @@ export default function PanelBarbero({ user }) {
       .subscribe();
 
     return () => supabase.removeChannel(channel);
-  }, [user?.barberia_id]);
+  }, [cargarDatos, user?.barberia_id, user?.id]);
 
   function terminar() {
     if (!barberoId || !proximoCliente) return;
@@ -190,11 +195,6 @@ export default function PanelBarbero({ user }) {
     } else {
       await ejecutarTerminar(null);
     }
-  }
-
-  function mostrarToast(mensaje, tipo = "success") {
-    setToast({ mensaje, tipo });
-    setTimeout(() => setToast(null), 3000);
   }
 
   function renderCardInfo() {

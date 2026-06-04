@@ -45,7 +45,7 @@ export default function SetPassword() {
       .then(({ error }) => {
         setTokenValido(!error);
       });
-  }, []);
+  }, [initialHash]);
 
   async function handleSubmit(e) {
     e.preventDefault();

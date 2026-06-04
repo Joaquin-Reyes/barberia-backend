@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { supabase, getAuthToken } from "../lib/supabase";
 
 const API = "https://barberia-backend-production-7dae.up.railway.app";
@@ -25,7 +25,12 @@ export default function Cola({ user }) {
   // CARGAR DATOS
   // ==============================
 
-  async function cargarCola() {
+  const mostrarToast = useCallback((mensaje, tipo = "success") => {
+    setToast({ mensaje, tipo });
+    setTimeout(() => setToast(null), 3000);
+  }, []);
+
+  const cargarCola = useCallback(async () => {
     const token = await getAuthToken();
     try {
       const res = await fetch(`${API}/cola/${user.barberia_id}`, {
@@ -41,7 +46,7 @@ export default function Cola({ user }) {
     } finally {
       setCargando(false);
     }
-  }
+  }, [mostrarToast, user?.barberia_id]);
 
   // ==============================
   // REALTIME
@@ -70,7 +75,7 @@ export default function Cola({ user }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.barberia_id]);
+  }, [cargarCola, user?.barberia_id]);
 
   // Foco al abrir modal
   useEffect(() => {
@@ -138,11 +143,6 @@ export default function Cola({ user }) {
   // ==============================
   // UI HELPERS
   // ==============================
-
-  function mostrarToast(mensaje, tipo = "success") {
-    setToast({ mensaje, tipo });
-    setTimeout(() => setToast(null), 3000);
-  }
 
   // ==============================
   // RENDER

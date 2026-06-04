@@ -1,8 +1,28 @@
-import { useEffect, useState } from "react";
-import { BarChart3, Trophy, List, TrendingUp } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { BarChart3, Trophy, List } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
+function getLunesDeEstaSemana(fecha) {
+  const d   = new Date(fecha);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  return d.toISOString().split("T")[0];
+}
+
+function getDomingoDeEstaSemana(fecha) {
+  const d = new Date(getLunesDeEstaSemana(fecha));
+  d.setDate(d.getDate() + 6);
+  return d.toISOString().split("T")[0];
+}
+
+function getUltimoDiaMes(fecha) {
+  const d = new Date(fecha);
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split("T")[0];
+}
+
 export default function Facturacion({ user }) {
+  const barberiaId = user?.barberia_id;
   const [turnos, setTurnos] = useState([]);
   const [barberos, setBarberos] = useState([]);
   const [periodo, setPeriodo] = useState("dia");
@@ -11,23 +31,18 @@ export default function Facturacion({ user }) {
   );
 
   useEffect(() => {
-    if (!user) return;
-    traerTurnos();
-  }, [user, fechaFiltro, periodo]);
-
-  useEffect(() => {
-    if (!user?.barberia_id) return;
+    if (!barberiaId) return;
     supabase
       .from("barberos")
       .select("nombre, es_duenio")
-      .eq("barberia_id", user.barberia_id)
+      .eq("barberia_id", barberiaId)
       .then(({ data }) => setBarberos(data || []));
-  }, [user?.barberia_id]);
+  }, [barberiaId]);
 
-  async function traerTurnos() {
+  const traerTurnos = useCallback(async () => {
     let query = supabase
       .from("turnos").select("*")
-      .eq("barberia_id", user.barberia_id)
+      .eq("barberia_id", barberiaId)
       .eq("estado", "completado");
 
     if (periodo === "dia") {
@@ -44,26 +59,15 @@ export default function Facturacion({ user }) {
 
     const { data } = await query;
     setTurnos(data || []);
-  }
+  }, [barberiaId, fechaFiltro, periodo]);
 
-  function getLunesDeEstaSemana(fecha) {
-    const d   = new Date(fecha);
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    d.setDate(diff);
-    return d.toISOString().split("T")[0];
-  }
-
-  function getDomingoDeEstaSemana(fecha) {
-    const d = new Date(getLunesDeEstaSemana(fecha));
-    d.setDate(d.getDate() + 6);
-    return d.toISOString().split("T")[0];
-  }
-
-  function getUltimoDiaMes(fecha) {
-    const d = new Date(fecha);
-    return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split("T")[0];
-  }
+  useEffect(() => {
+    if (!user) return;
+    async function cargarTurnos() {
+      await traerTurnos();
+    }
+    cargarTurnos();
+  }, [traerTurnos, user]);
 
   const esDuenioMap = barberos.reduce((acc, b) => {
     acc[b.nombre] = b.es_duenio || false;
@@ -181,7 +185,7 @@ export default function Facturacion({ user }) {
       <div style={{ padding: "24px", overflowY: "auto" }}>
 
         {/* MÉTRICAS */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+        <div className="metrics-grid">
           {metricCard(`Total ${labelPeriodo}`,        `$${totalPeriodo.toLocaleString("es-AR")}`,     "#16A34A")}
           {metricCard(`Ganancia barbería ${labelPeriodo}`, `$${gananciaBarberia.toLocaleString("es-AR")}`, "#2563EB")}
           {metricCard("Turnos completados",            turnos.length,                                  "#0F172A")}

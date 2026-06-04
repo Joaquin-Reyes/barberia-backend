@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle, Crown, Plus, Store } from "lucide-react";
 import { getAuthToken } from "../lib/supabase";
 
@@ -17,11 +17,12 @@ export default function SuperAdminPanel({ user, onLogout }) {
   });
   const [toast, setToast] = useState(null);
 
-  useEffect(() => {
-    traerBarberias();
+  const mostrarToast = useCallback((mensaje, tipo = "success") => {
+    setToast({ mensaje, tipo });
+    setTimeout(() => setToast(null), 3000);
   }, []);
 
-  async function traerBarberias() {
+  const traerBarberias = useCallback(async () => {
     const token = await getAuthToken();
     const res = await fetch(`${API}/superadmin/barberias`, {
       headers: {
@@ -30,12 +31,19 @@ export default function SuperAdminPanel({ user, onLogout }) {
     });
     const data = await res.json().catch(() => []);
     if (!res.ok) {
-      console.error("Error trayendo barberias:", data);
-      mostrarToast(data.error || "Error trayendo barberias", "error");
+      console.error("Error trayendo barberías:", data);
+      mostrarToast(data.error || "Error trayendo barberías", "error");
       return;
     }
     setBarberias(data || []);
-  }
+  }, [mostrarToast]);
+
+  useEffect(() => {
+    async function cargarBarberias() {
+      await traerBarberias();
+    }
+    cargarBarberias();
+  }, [traerBarberias]);
 
 async function crearBarberia() {
   if (!nombre || !email) return;
@@ -58,7 +66,7 @@ async function crearBarberia() {
     } else {
       mostrarToast(data.error || "Error al crear", "error");
     }
-  } catch (err) {
+  } catch {
     mostrarToast("Error de conexión", "error");
   }
 }
@@ -102,11 +110,6 @@ async function crearBarberia() {
       mostrarToast("Error al guardar", "error");
     }
   }
-
-  const mostrarToast = (mensaje, tipo = "success") => {
-    setToast({ mensaje, tipo });
-    setTimeout(() => setToast(null), 3000);
-  };
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white p-6">

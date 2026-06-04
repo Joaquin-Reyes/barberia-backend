@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Check, Plus, Search, Pencil, X } from "lucide-react";
 import { supabase, turnoDisponible, getAuthToken } from "../lib/supabase";
 
 const API = "https://barberia-backend-production-7dae.up.railway.app";
 
-export default function Turnos({ user, onLogout }) {
+export default function Turnos({ user }) {
+  const barberiaId = user?.barberia_id;
   const [turnos, setTurnos] = useState([]);
   const [barberos, setBarberos] = useState([]);
   const [servicios, setServicios] = useState([]);
@@ -17,12 +18,52 @@ export default function Turnos({ user, onLogout }) {
   const [filtroFecha, setFiltroFecha] = useState("");
   const [editando, setEditando] = useState({ id: null, valores: null });
 
+  const traerTurnos = useCallback(async () => {
+    const { data } = await supabase
+      .from("turnos").select("*")
+      .eq("barberia_id", barberiaId)
+      .order("fecha", { ascending: true });
+    setTurnos(data || []);
+  }, [barberiaId]);
+
+  const traerBarberos = useCallback(async () => {
+    const { data } = await supabase
+      .from("barberos").select("*")
+      .eq("barberia_id", barberiaId);
+    setBarberos(data || []);
+  }, [barberiaId]);
+
+  const traerServicios = useCallback(async () => {
+    const { data } = await supabase
+      .from("servicios").select("*")
+      .eq("barberia_id", barberiaId);
+    setServicios(data || []);
+  }, [barberiaId]);
+
+  const generarHorarios = (inicio, fin) => {
+    const horas = [];
+    const normalizar = (valor) => {
+      const [h = "0", m = "0"] = String(valor || "").split(":");
+      return Number(h) * 60 + Number(m);
+    };
+    const inicioMin = normalizar(inicio);
+    const finMin = normalizar(fin);
+    if (isNaN(inicioMin) || isNaN(finMin)) return horas;
+    for (let min = inicioMin; min < finMin; min += 30) {
+      const h = Math.floor(min / 60);
+      const m = min % 60;
+      horas.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+    }
+    return horas;
+  };
+
   useEffect(() => {
     if (!user) return;
-    traerTurnos();
-    traerBarberos();
-    traerServicios();
-  }, [user]);
+    async function cargarDatos() {
+      await Promise.all([traerTurnos(), traerBarberos(), traerServicios()]);
+    }
+    cargarDatos();
+  }, [traerBarberos, traerServicios, traerTurnos, user]);
 
   useEffect(() => {
     if (!nuevo.barbero || !nuevo.fecha || !user) return;
@@ -31,7 +72,7 @@ export default function Turnos({ user, onLogout }) {
         .from("barberos")
         .select("id")
         .eq("nombre", nuevo.barbero)
-        .eq("barberia_id", user.barberia_id)
+        .eq("barberia_id", barberiaId)
         .single();
 
       if (!barberoData) return;
@@ -53,46 +94,7 @@ export default function Turnos({ user, onLogout }) {
       }
     }
     cargarHorarios();
-  }, [nuevo.barbero, nuevo.fecha]);
-
-  async function traerTurnos() {
-    const { data } = await supabase
-      .from("turnos").select("*")
-      .eq("barberia_id", user.barberia_id)
-      .order("fecha", { ascending: true });
-    setTurnos(data || []);
-  }
-
-  async function traerBarberos() {
-    const { data } = await supabase
-      .from("barberos").select("*")
-      .eq("barberia_id", user.barberia_id);
-    setBarberos(data || []);
-  }
-
-  async function traerServicios() {
-    const { data } = await supabase
-      .from("servicios").select("*")
-      .eq("barberia_id", user.barberia_id);
-    setServicios(data || []);
-  }
-
-  const generarHorarios = (inicio, fin) => {
-    const horas = [];
-    const normalizar = (valor) => {
-      const [h = "0", m = "0"] = String(valor || "").split(":");
-      return Number(h) * 60 + Number(m);
-    };
-    const inicioMin = normalizar(inicio);
-    const finMin = normalizar(fin);
-    if (isNaN(inicioMin) || isNaN(finMin)) return horas;
-    for (let min = inicioMin; min < finMin; min += 30) {
-      const h = Math.floor(min / 60);
-      const m = min % 60;
-      horas.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
-    }
-    return horas;
-  };
+  }, [barberiaId, nuevo.barbero, nuevo.fecha, user]);
 
   const handleBarberoChange = (barberoNombre) => {
     setNuevo({ ...nuevo, barbero: barberoNombre, hora: "" });
@@ -166,7 +168,7 @@ export default function Turnos({ user, onLogout }) {
     }
 
     if (!esMediaHora(horaNormalizada)) {
-      mostrarToast("Elegi una hora en punto o y media", "error");
+      mostrarToast("Elegí una hora en punto o y media", "error");
       return;
     }
 
@@ -255,7 +257,7 @@ export default function Turnos({ user, onLogout }) {
                 onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })}
               />
               <input
-                placeholder="Telefono"
+                placeholder="Teléfono"
                 value={nuevo.telefono}
                 onChange={(e) => setNuevo({ ...nuevo, telefono: e.target.value })}
               />
@@ -308,7 +310,7 @@ export default function Turnos({ user, onLogout }) {
                       return;
                     }
                     if (!esMediaHora(nuevo.hora)) {
-                      mostrarToast("Elegi una hora en punto o y media", "error");
+                      mostrarToast("Elegí una hora en punto o y media", "error");
                       return;
                     }
                     const disponible = nuevo.barbero
@@ -334,7 +336,7 @@ export default function Turnos({ user, onLogout }) {
                         mostrarToast(data.error || "Error al crear turno", "error");
                       }
                     } catch {
-                      mostrarToast("Error de conexion", "error");
+                      mostrarToast("Error de conexión", "error");
                     }
                   }}
                 >
@@ -378,7 +380,7 @@ export default function Turnos({ user, onLogout }) {
               <thead>
                 <tr>
                   <th>Nombre</th>
-                  <th className="col-mobile-hide">Telefono</th>
+                  <th className="col-mobile-hide">Teléfono</th>
                   <th>Servicio</th>
                   <th>Barbero</th>
                   <th>Fecha</th>
@@ -537,6 +539,7 @@ export default function Turnos({ user, onLogout }) {
                                 </button>
                                 <button
                                   onClick={async () => {
+                                    if (!window.confirm(`¿Eliminar el turno de ${t.nombre}?`)) return;
                                     await supabase.from("turnos").delete().eq("id", t.id);
                                     traerTurnos();
                                   }}

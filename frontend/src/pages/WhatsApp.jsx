@@ -9,15 +9,9 @@ export default function WhatsApp({ user }) {
   const [wpStatus, setWpStatus] = useState(null);
   const [wpQR, setWpQR] = useState(null);
   const [wpError, setWpError] = useState(null);
-  const [toast, setToast] = useState(null);
   const wpPollRef = useRef(null);
   const wpPollAttemptsRef = useRef(0);
   const barberiaId = user?.barberia_id;
-
-  const mostrarToast = useCallback((mensaje, tipo = "success") => {
-    setToast({ mensaje, tipo });
-    setTimeout(() => setToast(null), 3000);
-  }, []);
 
   const detenerPolling = useCallback(() => {
     if (wpPollRef.current) {
@@ -43,7 +37,7 @@ export default function WhatsApp({ user }) {
       if (data.status === "authenticated" || data.status === "disabled" || data.status === "error") {
         detenerPolling();
       } else if (wpPollAttemptsRef.current >= 12) {
-        setWpError("Tiempo de conexion agotado. Volve a tocar conectar para generar otro intento.");
+        setWpError("Tiempo de conexión agotado. Volvé a tocar conectar para generar otro intento.");
         detenerPolling();
       }
     } catch (error) {
@@ -102,7 +96,6 @@ export default function WhatsApp({ user }) {
 
   useEffect(() => {
     if (!user) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     traerBarberia();
   }, [traerBarberia, user]);
 
@@ -126,7 +119,7 @@ export default function WhatsApp({ user }) {
     loading: "Iniciando",
     initializing: "Inicializando",
     disconnected: "Reconectando",
-    auth_failure: "Error de autenticacion",
+    auth_failure: "Error de autenticación",
     disabled: "Deshabilitado",
     error: "Error",
   }[wpStatus] || "Sin conectar";
@@ -136,15 +129,13 @@ export default function WhatsApp({ user }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      {toast && <div className={`toast ${toast.tipo}`}>{toast.mensaje}</div>}
-
       <div style={topbarStyle}>
         <div>
           <h1 style={{ fontSize: 15, fontWeight: 600, margin: 0, letterSpacing: "-0.02em", color: "#0F172A" }}>
             WhatsApp
           </h1>
           <p style={{ fontSize: 12, color: "#94A3B8", margin: "2px 0 0" }}>
-            Conexion del canal de mensajes
+            Conexión del canal de mensajes
           </p>
         </div>
       </div>
@@ -157,9 +148,9 @@ export default function WhatsApp({ user }) {
                 <MessageCircle size={17} color="#16A34A" />
               </div>
               <div>
-                <h2 style={{ margin: 0 }}>Conexion WhatsApp Web</h2>
+                <h2 style={{ margin: 0 }}>Conexión WhatsApp Web</h2>
                 <p style={{ margin: "3px 0 0", fontSize: 13, color: "#64748B" }}>
-                  {barberia?.whatsapp_number ? `Numero: ${barberia.whatsapp_number}` : "Numero sin configurar"}
+                  {barberia?.whatsapp_number ? `Número: ${barberia.whatsapp_number}` : "Número sin configurar"}
                 </p>
               </div>
             </div>
@@ -175,7 +166,7 @@ export default function WhatsApp({ user }) {
             <div style={{ display: "flex", gap: 10, padding: "12px 14px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 8 }}>
               <AlertTriangle size={17} color="#2563EB" />
               <div>
-                <p style={{ margin: 0, color: "#1E40AF", fontSize: 13, fontWeight: 600 }}>Esta barberia usa Cloud API</p>
+                <p style={{ margin: 0, color: "#1E40AF", fontSize: 13, fontWeight: 600 }}>Esta barbería usa Cloud API</p>
                 <p style={{ margin: "3px 0 0", color: "#2563EB", fontSize: 13 }}>
                   No necesita QR. El modo y las credenciales se administran desde SuperAdmin.
                 </p>
@@ -194,7 +185,7 @@ export default function WhatsApp({ user }) {
           )}
 
           {!isCloudApi && wpStatus === "loading" && (
-            <p style={{ fontSize: 13, color: "#64748B", margin: 0 }}>Iniciando conexion...</p>
+            <p style={{ fontSize: 13, color: "#64748B", margin: 0 }}>Iniciando conexión...</p>
           )}
 
           {!isCloudApi && wpStatus === "initializing" && (
@@ -213,7 +204,7 @@ export default function WhatsApp({ user }) {
           {!isCloudApi && wpStatus === "qr_pending" && wpQR && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 12 }}>
               <p style={{ fontSize: 13, color: "#64748B", margin: 0 }}>
-                Escanea el QR con WhatsApp en tu telefono.
+                Escaneá el QR con WhatsApp en tu teléfono.
               </p>
               <img
                 src={wpQR}

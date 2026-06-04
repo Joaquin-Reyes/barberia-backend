@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { createElement, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { LayoutDashboard, Users, DollarSign, Settings, LogOut, Clock, Scissors, Menu, X, MessageCircle, ClipboardList } from 'lucide-react'
 
@@ -68,7 +68,7 @@ function Dashboard({ user, onLogout }) {
                   : { color: '#64748B' }
               }
             >
-              <Icon size={15} />
+              {createElement(Icon, { size: 15 })}
               {label}
             </NavLink>
           ))}
@@ -202,7 +202,7 @@ function Dashboard({ user, onLogout }) {
                   : { color: '#64748B' }
               }
             >
-              <Icon size={17} />
+              {createElement(Icon, { size: 17 })}
               {label}
             </NavLink>
           ))}

@@ -6,7 +6,7 @@ const API = "https://barberia-backend-production-7dae.up.railway.app";
 
 const estados = {
   pendiente: "Pendiente",
-  en_revision: "En revision",
+  en_revision: "En revisión",
   resuelta: "Resuelta",
   descartada: "Descartada",
 };
@@ -97,7 +97,7 @@ export default function SolicitudesWhatsApp({ user }) {
             Solicitudes WhatsApp
           </h1>
           <p style={{ fontSize: 12, color: "#94A3B8", margin: "2px 0 0" }}>
-            Bandeja previa a la confirmacion de turnos
+            Bandeja previa a la confirmación de turnos
           </p>
         </div>
         <button
@@ -119,7 +119,7 @@ export default function SolicitudesWhatsApp({ user }) {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <select value={estado} onChange={(e) => setEstado(e.target.value)} style={{ minWidth: 150 }}>
               <option value="pendiente">Pendientes</option>
-              <option value="en_revision">En revision</option>
+              <option value="en_revision">En revisión</option>
               <option value="resuelta">Resueltas</option>
               <option value="descartada">Descartadas</option>
               <option value="todas">Todas</option>
@@ -127,7 +127,7 @@ export default function SolicitudesWhatsApp({ user }) {
             <input
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Buscar cliente, telefono o servicio"
+              placeholder="Buscar cliente, teléfono o servicio"
               style={{ flex: 1, minWidth: 220 }}
             />
           </div>
@@ -187,7 +187,7 @@ export default function SolicitudesWhatsApp({ user }) {
                         <button
                           onClick={() => actualizarEstado(solicitud.id, "en_revision")}
                           style={{ padding: "6px 9px", background: "#F1F5F9", color: "#475569", border: "1px solid #E2E8F0" }}
-                          aria-label="Marcar en revision"
+                          aria-label="Marcar en revisión"
                         >
                           <ClipboardList size={13} />
                         </button>

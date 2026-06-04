@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Plus, X, Calendar, AlertCircle, Check, Users, Mail } from "lucide-react";
 import { supabase, getAuthToken } from "../lib/supabase";
 
@@ -39,17 +39,17 @@ export default function Barberos({ user }) {
     fecha: "", trabaja: false, hora_inicio: "", hora_fin: "", motivo: ""
   });
 
-  useEffect(() => {
-    if (!user) return;
-    traerBarberos();
-  }, [user]);
-
-  async function traerBarberos() {
+  const traerBarberos = useCallback(async () => {
     const { data } = await supabase
       .from("barberos").select("*")
       .eq("barberia_id", user.barberia_id);
     setBarberos(data || []);
-  }
+  }, [user?.barberia_id]);
+
+  useEffect(() => {
+    if (!user) return;
+    traerBarberos();
+  }, [traerBarberos, user]);
 
   async function seleccionarBarbero(barbero) {
     if (barberoSeleccionado?.id === barbero.id) {
@@ -147,6 +147,7 @@ export default function Barberos({ user }) {
   }
 
   async function eliminarExcepcion(id) {
+    if (!window.confirm("¿Eliminar esta excepción de horario?")) return;
     await supabase.from("excepciones_barbero").delete().eq("id", id);
     await cargarExcepciones(barberoSeleccionado.id);
     mostrarToast("Excepción eliminada");
@@ -387,6 +388,7 @@ export default function Barberos({ user }) {
                             </button>
                             <button
                               onClick={async () => {
+                                if (!window.confirm(`¿Eliminar a ${b.nombre}?`)) return;
                                 const token = await getAuthToken();
                                 if (!token) {
                                   mostrarToast("Sesión expirada. Volvé a iniciar sesión.", "error");

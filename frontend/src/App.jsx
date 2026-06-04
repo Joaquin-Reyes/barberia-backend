@@ -34,17 +34,16 @@ async function activarCuenta(token) {
 
 function App() {
   const [user, setUser] = useState(null)
-  const [cargando, setCargando] = useState(true)
 
   // Capturar el hash en el primer render sincrónico, antes de que Supabase lo limpie
   const [esInvite] = useState(() => {
     const hash = new URLSearchParams(window.location.hash.substring(1))
     return !!(hash.get('access_token') && (hash.get('type') === 'invite' || hash.get('type') === 'recovery'))
   })
+  const [cargando, setCargando] = useState(() => !esInvite)
 
   useEffect(() => {
     if (esInvite) {
-      setCargando(false)
       return
     }
 
@@ -72,7 +71,7 @@ function App() {
       }
       setCargando(false)
     })
-  }, [])
+  }, [esInvite])
 
   if (esInvite || window.location.pathname === '/set-password') {
     return <SetPassword />
