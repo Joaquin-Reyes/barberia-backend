@@ -22,7 +22,8 @@ export default function Turnos({ user }) {
     const { data } = await supabase
       .from("turnos").select("*")
       .eq("barberia_id", barberiaId)
-      .order("fecha", { ascending: true });
+      .order("fecha", { ascending: true })
+      .order("hora", { ascending: true });
     setTurnos(data || []);
   }, [barberiaId]);
 
@@ -103,6 +104,9 @@ export default function Turnos({ user }) {
 
   const normHora = (h) => String(h || "").slice(0, 5).replace(/^(\d):/, "0$1:");
   const esMediaHora = (h) => ["00", "30"].includes(normHora(h).split(":")[1]);
+  const compararTurnosPorHorario = (a, b) =>
+    String(a.fecha || "").localeCompare(String(b.fecha || "")) ||
+    normHora(a.hora).localeCompare(normHora(b.hora));
 
   const horariosDisponibles = horarios.filter((h) =>
     !turnos.some((t) => t.fecha === nuevo.fecha && t.barbero === nuevo.barbero && normHora(t.hora) === h)
@@ -132,7 +136,7 @@ export default function Turnos({ user }) {
     (user.rol === "admin" || user.rol === "superadmin" || t.barbero === user.nombre) &&
     t.nombre.toLowerCase().includes(busqueda.toLowerCase()) &&
     (filtroFecha ? t.fecha === filtroFecha : true)
-  );
+  ).sort(compararTurnosPorHorario);
 
   function iniciarEdicionFila(turno) {
     setEditando({
