@@ -15,7 +15,8 @@ const {
   getWhatsappStatus,
   getWhatsappChats,
   listarSolicitudesWhatsapp,
-  actualizarSolicitudWhatsapp
+  actualizarSolicitudWhatsapp,
+  crearTurnoDesdeSolicitudWhatsapp
 } = require("../contollers/admin.controller");
 
 // 🔐 Proteger panel barbero (antes de la protección general)
@@ -34,6 +35,7 @@ router.get("/whatsapp/status", authMiddleware, getWhatsappStatus);
 router.get("/whatsapp/chats", authMiddleware, getWhatsappChats);
 router.get("/whatsapp/qr", authMiddleware, getWhatsappQR);
 router.get("/solicitudes-whatsapp", authMiddleware, listarSolicitudesWhatsapp);
+router.post("/solicitudes-whatsapp/:id/crear-turno", authMiddleware, crearTurnoDesdeSolicitudWhatsapp);
 router.put("/solicitudes-whatsapp/:id", authMiddleware, actualizarSolicitudWhatsapp);
 
 // 🔐 Proteger panel HTML (deja pasar las APIs)

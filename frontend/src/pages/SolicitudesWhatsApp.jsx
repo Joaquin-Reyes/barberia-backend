@@ -26,6 +26,7 @@ export default function SolicitudesWhatsApp({ user }) {
   const [estado, setEstado] = useState("pendiente");
   const [busqueda, setBusqueda] = useState("");
   const [cargando, setCargando] = useState(false);
+  const [guardandoTurnoId, setGuardandoTurnoId] = useState(null);
   const [toast, setToast] = useState(null);
 
   const mostrarToast = useCallback((mensaje, tipo = "success") => {
@@ -72,6 +73,25 @@ export default function SolicitudesWhatsApp({ user }) {
       cargarSolicitudes();
     } catch (error) {
       mostrarToast(error.message || "No se pudo actualizar", "error");
+    }
+  }
+
+  async function guardarTurno(solicitud) {
+    setGuardandoTurnoId(solicitud.id);
+    try {
+      const token = await getAuthToken();
+      const res = await fetch(`${API}/admin/solicitudes-whatsapp/${solicitud.id}/crear-turno`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo guardar el turno");
+      mostrarToast(data.warning || "Turno guardado correctamente");
+      cargarSolicitudes();
+    } catch (error) {
+      mostrarToast(error.message || "No se pudo guardar el turno", "error");
+    } finally {
+      setGuardandoTurnoId(null);
     }
   }
 
@@ -165,6 +185,9 @@ export default function SolicitudesWhatsApp({ user }) {
                     <td>
                       <div style={{ fontWeight: 600 }}>{solicitud.nombre || "Sin nombre"}</div>
                       <div style={{ fontSize: 12, color: "#64748B" }}>{solicitud.telefono}</div>
+                      {solicitud.turno_id && (
+                        <div style={{ fontSize: 11, color: "#16A34A", marginTop: 2 }}>Turno registrado</div>
+                      )}
                     </td>
                     <td>
                       <div>{solicitud.servicio || "Sin servicio"}</div>
@@ -185,18 +208,33 @@ export default function SolicitudesWhatsApp({ user }) {
                     <td>
                       <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
                         <button
+                          onClick={() => guardarTurno(solicitud)}
+                          disabled={
+                            guardandoTurnoId === solicitud.id ||
+                            Boolean(solicitud.turno_id) ||
+                            !solicitud.nombre ||
+                            !solicitud.telefono ||
+                            !solicitud.servicio ||
+                            !solicitud.profesional ||
+                            !solicitud.fecha_preferida ||
+                            !solicitud.hora_preferida
+                          }
+                          style={{
+                            padding: "6px 9px",
+                            background: solicitud.turno_id ? "#DCFCE7" : "#2563EB",
+                            opacity: guardandoTurnoId === solicitud.id || solicitud.turno_id ? 0.7 : 1,
+                          }}
+                          aria-label="Guardar turno"
+                          title="Guardar turno"
+                        >
+                          <Check size={13} />
+                        </button>
+                        <button
                           onClick={() => actualizarEstado(solicitud.id, "en_revision")}
                           style={{ padding: "6px 9px", background: "#F1F5F9", color: "#475569", border: "1px solid #E2E8F0" }}
                           aria-label="Marcar en revisión"
                         >
                           <ClipboardList size={13} />
-                        </button>
-                        <button
-                          onClick={() => actualizarEstado(solicitud.id, "resuelta")}
-                          style={{ padding: "6px 9px", background: "#16A34A" }}
-                          aria-label="Marcar resuelta"
-                        >
-                          <Check size={13} />
                         </button>
                         <button
                           onClick={() => actualizarEstado(solicitud.id, "descartada")}

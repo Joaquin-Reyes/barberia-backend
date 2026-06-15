@@ -1,6 +1,6 @@
 const { supabaseAdmin } = require("../config/supabase");
 const { notificarBarbero, enviarTemplateConfirmacion } = require("../services/whatsapp.service");
-const { formatearHora } = require("../services/agenda.service");
+const { formatearHora, obtenerHorariosDisponibles } = require("../services/agenda.service");
 const wwebjsManager = require("../services/wwebjs.manager");
 
 function isWhatsappDirectChatId(chatId) {
@@ -575,6 +575,111 @@ async function actualizarSolicitudWhatsapp(req, res) {
   res.json(data);
 }
 
+async function crearTurnoDesdeSolicitudWhatsapp(req, res) {
+  const barberia_id = req.user.barberia_id;
+  const { id } = req.params;
+
+  try {
+    const { data: solicitud, error: solicitudError } = await supabaseAdmin
+      .from("solicitudes_whatsapp")
+      .select("*")
+      .eq("id", id)
+      .eq("barberia_id", barberia_id)
+      .single();
+
+    if (solicitudError || !solicitud) {
+      return res.status(404).json({ error: "Solicitud no encontrada" });
+    }
+
+    const nombre = String(solicitud.nombre || "").trim();
+    const telefono = String(solicitud.telefono || "").trim();
+    const servicio = String(solicitud.servicio || "").trim();
+    const barbero = String(solicitud.profesional || "").trim();
+    const fecha = String(solicitud.fecha_preferida || "").trim();
+    const hora = formatearHora(solicitud.hora_preferida);
+
+    if (!nombre || !telefono || !servicio || !barbero || !fecha || !hora) {
+      return res.status(400).json({ error: "La solicitud no tiene todos los datos para crear el turno" });
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      return res.status(400).json({ error: "La fecha de la solicitud debe estar en formato YYYY-MM-DD" });
+    }
+
+    const horariosDisponibles = await obtenerHorariosDisponibles(barbero, barberia_id, fecha);
+    if (!horariosDisponibles.includes(hora)) {
+      return res.status(400).json({ error: "Ese horario ya no esta disponible" });
+    }
+
+    const { data: servicioData } = await supabaseAdmin
+      .from("servicios")
+      .select("precio")
+      .eq("barberia_id", barberia_id)
+      .ilike("nombre", servicio)
+      .maybeSingle();
+
+    const { data: turno, error: turnoError } = await supabaseAdmin
+      .from("turnos")
+      .insert([{
+        nombre,
+        telefono,
+        servicio,
+        precio: servicioData?.precio || 0,
+        barbero,
+        fecha,
+        hora,
+        barberia_id,
+        estado: "confirmado",
+        recordatorio_24h: false,
+        recordatorio_3h: false
+      }])
+      .select("*")
+      .single();
+
+    if (turnoError) {
+      console.log("❌ Error creando turno desde solicitud:", turnoError);
+      return res.status(500).json({ error: "No se pudo crear el turno" });
+    }
+
+    const cambiosSolicitud = {
+      estado: "resuelta",
+      turno_id: turno.id,
+      updated_at: new Date().toISOString()
+    };
+
+    const { error: updateError } = await supabaseAdmin
+      .from("solicitudes_whatsapp")
+      .update(cambiosSolicitud)
+      .eq("id", solicitud.id)
+      .eq("barberia_id", barberia_id);
+
+    if (updateError) {
+      console.log("⚠️ Turno creado pero no se pudo vincular la solicitud:", updateError);
+      return res.json({ ok: true, turno, warning: "Turno creado, pero no se pudo vincular la solicitud" });
+    }
+
+    try {
+      const [y, m, d] = fecha.split("-");
+      await enviarTemplateConfirmacion({
+        telefono,
+        servicio,
+        barbero,
+        fecha: `${d}/${m}/${y}`,
+        horario: hora,
+        precio: servicioData?.precio || 0,
+        barberia_id
+      });
+    } catch (errTemplate) {
+      console.error("❌ Error enviando confirmacion desde solicitud:", errTemplate.response?.data || errTemplate.message);
+    }
+
+    res.json({ ok: true, turno });
+  } catch (err) {
+    console.log("❌ Error general creando turno desde solicitud:", err);
+    res.status(500).json({ error: "Error interno" });
+  }
+}
+
 module.exports = {
   crearTurno,
   listarTurnos,
@@ -588,5 +693,6 @@ module.exports = {
   getWhatsappStatus,
   getWhatsappChats,
   listarSolicitudesWhatsapp,
-  actualizarSolicitudWhatsapp
+  actualizarSolicitudWhatsapp,
+  crearTurnoDesdeSolicitudWhatsapp
 };
