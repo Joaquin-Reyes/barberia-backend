@@ -3,6 +3,8 @@ const { enviarMensaje, asyncLocalStorage } = require("./whatsapp.service");
 const { obtenerHorariosDisponibles, formatearHora } = require("./agenda.service");
 
 const sesiones = new Map();
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+const IA_RECEPCION_ENABLED = process.env.WHATSAPP_RECEPCION_AI_ENABLED === "true";
 
 function limpiarTelefono(valor) {
   return String(valor || "").replace("@c.us", "").replace(/\D/g, "");
@@ -11,6 +13,10 @@ function limpiarTelefono(valor) {
 function resolverDestinoWhatsapp(valor) {
   const texto = String(valor || "");
   return texto.includes("@") ? texto : limpiarTelefono(texto);
+}
+
+function iaRecepcionDisponible() {
+  return IA_RECEPCION_ENABLED && Boolean(process.env.OPENAI_API_KEY);
 }
 
 function normalizarTexto(texto) {
@@ -67,6 +73,13 @@ function extraerHora(texto) {
   return `${String(hora).padStart(2, "0")}:${String(minutos).padStart(2, "0")}`;
 }
 
+function extraerMomentoDelDia(texto) {
+  const normalizado = normalizarTexto(texto);
+  if (normalizado.includes("tarde")) return "tarde";
+  if (normalizado.includes("manana")) return "manana";
+  return null;
+}
+
 function extraerFechaPreferida(texto) {
   const normalizado = normalizarTexto(texto);
   const fechaNumerica = String(texto || "").match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
@@ -91,6 +104,10 @@ function fechaISOArgentina(fecha = new Date()) {
   return formatter.format(fecha);
 }
 
+function hoyArgentinaDate() {
+  return new Date(`${fechaISOArgentina()}T12:00:00-03:00`);
+}
+
 function sumarDias(fecha, dias) {
   const copia = new Date(fecha);
   copia.setDate(copia.getDate() + dias);
@@ -99,7 +116,7 @@ function sumarDias(fecha, dias) {
 
 function resolverFechaPreferida(texto) {
   const normalizado = normalizarTexto(texto);
-  const hoy = new Date(`${fechaISOArgentina()}T12:00:00-03:00`);
+  const hoy = hoyArgentinaDate();
 
   if (normalizado.includes("hoy")) return fechaISOArgentina(hoy);
   if (normalizado.includes("manana")) return fechaISOArgentina(sumarDias(hoy, 1));
@@ -138,9 +155,146 @@ function resolverFechaPreferida(texto) {
   return fechaISOArgentina(fecha);
 }
 
-function extraerDatosLibres(texto, sesion, barberia) {
-  const normalizado = normalizarTexto(texto);
+function normalizarNombrePropio(valor) {
+  const nombre = String(valor || "")
+    .trim()
+    .replace(/\s+/g, " ");
 
+  if (!nombre) return null;
+
+  const normalizado = normalizarTexto(nombre);
+  const invalidos = ["null", "undefined", "na", "n/a", "corte", "barba", "turno", "hola"];
+  if (invalidos.includes(normalizado)) return null;
+
+  const palabras = nombre.split(" ").filter(Boolean);
+  if (palabras.length === 1 && palabras[0].length < 3) return null;
+
+  return nombre;
+}
+
+function normalizarFechaIA(valor) {
+  if (!valor) return null;
+  const texto = String(valor).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) return texto;
+  return resolverFechaPreferida(texto);
+}
+
+function normalizarMomentoIA(valor) {
+  const normalizado = normalizarTexto(valor);
+  if (normalizado === "tarde") return "tarde";
+  if (normalizado === "manana") return "manana";
+  return null;
+}
+
+function normalizarExtraccionIA(extraccion, barberia) {
+  if (!extraccion || typeof extraccion !== "object") return null;
+
+  const nombre = normalizarNombrePropio(extraccion.nombre);
+  const servicioDetectado = detectarServicio(extraccion.servicio, barberia.servicios || []);
+  const profesionalDetectado = detectarProfesional(extraccion.profesional, barberia.barberos || []);
+  const fecha = normalizarFechaIA(extraccion.fecha_preferida);
+  const hora = extraerHora(extraccion.hora_preferida);
+  const momento = normalizarMomentoIA(extraccion.momento_dia);
+
+  return {
+    nombre: nombre || null,
+    servicio: servicioDetectado?.nombre || null,
+    profesional: profesionalDetectado?.nombre || null,
+    fecha_preferida: fecha || null,
+    hora_preferida: hora || null,
+    momento_dia: momento || null
+  };
+}
+
+async function inferirCamposConIA({ mensaje, sesion, barberia }) {
+  if (!iaRecepcionDisponible()) return null;
+
+  const servicios = (barberia.servicios || []).map((servicio) => servicio.nombre);
+  const barberos = (barberia.barberos || []).map((barbero) => barbero.nombre);
+  const hoy = fechaISOArgentina();
+
+  const promptSistema = [
+    "Sos un extractor de datos para recepcion de turnos de una barberia.",
+    "Devolve SOLO JSON valido, sin markdown ni explicaciones.",
+    "Extrae unicamente si hay alta confianza.",
+    `Hoy en Argentina es ${hoy}.`,
+    "Campos permitidos: nombre, servicio, profesional, fecha_preferida, hora_preferida, momento_dia.",
+    "fecha_preferida debe estar en formato YYYY-MM-DD cuando pueda resolverse.",
+    "hora_preferida debe estar en formato HH:MM de 24 horas cuando exista.",
+    "momento_dia solo puede ser manana o tarde.",
+    "Si un campo no esta claro, devolvelo como null."
+  ].join(" ");
+
+  const promptUsuario = JSON.stringify({
+    mensaje,
+    sesion_actual: {
+      nombre: sesion.nombre,
+      servicio: sesion.servicio,
+      profesional: sesion.profesional,
+      fecha_preferida: sesion.fecha_preferida,
+      hora_preferida: sesion.hora_preferida
+    },
+    servicios_disponibles: servicios,
+    barberos_disponibles: barberos
+  });
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        temperature: 0,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: promptSistema },
+          { role: "user", content: promptUsuario }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[recepcion-ai] Error OpenAI:", response.status, errorText);
+      return null;
+    }
+
+    const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content;
+    if (!content) return null;
+
+    const extraccion = normalizarExtraccionIA(JSON.parse(content), barberia);
+    console.log("[recepcion-ai] extraccion ok:", JSON.stringify(extraccion));
+    return extraccion;
+  } catch (error) {
+    console.error("[recepcion-ai] Fallo interpretando mensaje:", error.message);
+    return null;
+  }
+}
+
+function aplicarExtraccionIA(sesion, extraccion) {
+  if (!extraccion) return;
+
+  if (!sesion.nombre && extraccion.nombre) sesion.nombre = extraccion.nombre;
+  if (!sesion.servicio && extraccion.servicio) sesion.servicio = extraccion.servicio;
+  if (!sesion.profesional && extraccion.profesional) sesion.profesional = extraccion.profesional;
+  if (!sesion.fecha_preferida && extraccion.fecha_preferida) sesion.fecha_preferida = extraccion.fecha_preferida;
+  if (!sesion.hora_preferida && extraccion.hora_preferida) sesion.hora_preferida = extraccion.hora_preferida;
+}
+
+function solicitudListaParaGuardar(sesion) {
+  return Boolean(
+    normalizarNombrePropio(sesion.nombre) &&
+    sesion.servicio &&
+    sesion.fecha_preferida &&
+    sesion.hora_preferida
+  );
+}
+
+function extraerDatosLibres(texto, sesion, barberia) {
   if (!sesion.nombre) {
     const nombreMatch = String(texto || "").match(/\b(?:soy|me llamo|mi nombre es)\s+([a-zA-Z\u00C0-\u017F\s]{2,40})/i);
     if (nombreMatch) sesion.nombre = nombreMatch[1].trim();
@@ -155,14 +309,12 @@ function extraerDatosLibres(texto, sesion, barberia) {
   }
 
   if (!sesion.servicio) {
-    const servicios = barberia.servicios || [];
-    const servicioDetectado = detectarServicio(texto, servicios);
+    const servicioDetectado = detectarServicio(texto, barberia.servicios || []);
     if (servicioDetectado) sesion.servicio = servicioDetectado.nombre;
   }
 
   if (!sesion.profesional) {
-    const profesionales = barberia.barberos || [];
-    const profesionalDetectado = profesionales.find((barbero) => normalizado.includes(normalizarTexto(barbero.nombre)));
+    const profesionalDetectado = detectarProfesional(texto, barberia.barberos || []);
     if (profesionalDetectado) sesion.profesional = profesionalDetectado.nombre;
   }
 }
@@ -177,6 +329,21 @@ function detectarServicio(texto, servicios) {
   }) || null;
 }
 
+function detectarProfesional(texto, barberos) {
+  const normalizado = normalizarTexto(texto);
+  if (!normalizado) return null;
+
+  return (barberos || []).find((barbero) => {
+    const nombre = normalizarTexto(barbero.nombre);
+    return (
+      normalizado.includes(nombre) ||
+      nombre.startsWith(normalizado) ||
+      normalizado.endsWith(` ${nombre}`) ||
+      normalizado.includes(`con ${nombre}`)
+    );
+  }) || null;
+}
+
 function listarServicios(barberia) {
   const nombres = (barberia.servicios || []).map((servicio) => servicio.nombre).filter(Boolean);
   if (nombres.length === 0) return "";
@@ -188,6 +355,17 @@ function resetearDisponibilidad(sesion) {
   sesion.horaPendiente = null;
   sesion.opcionesDisponibles = [];
   sesion.disponibilidadValidada = false;
+}
+
+function filtrarOpcionesPorMomento(opciones, momento) {
+  if (!momento) return opciones;
+
+  return (opciones || []).filter((opcion) => {
+    const [hora] = String(opcion.hora || "00:00").split(":").map(Number);
+    if (momento === "manana") return hora < 13;
+    if (momento === "tarde") return hora >= 13;
+    return true;
+  });
 }
 
 function siguientePregunta(sesion) {
@@ -345,6 +523,19 @@ async function procesarRecepcionWhatsapp({ barberia_id, from, text }) {
   const barberia = await obtenerDatosBarberia(barberia_id);
   const sesion = sesiones.get(userKey) || crearSesion();
   const mensaje = String(text || "").trim();
+  const fechaAnterior = sesion.fecha_preferida;
+  const extraccionIA = await inferirCamposConIA({ mensaje, sesion, barberia });
+  console.log(`[recepcion] barberia=${barberia_id} ai=${extraccionIA ? "on" : iaRecepcionDisponible() ? "fallback" : "off"} from=${telefono} msg="${mensaje.slice(0, 80)}"`);
+  aplicarExtraccionIA(sesion, extraccionIA);
+  const fechaDetectadaEnMensaje = resolverFechaPreferida(mensaje);
+  const horaDetectadaEnMensaje = extraerHora(mensaje);
+  const momentoDetectadoEnMensaje = extraccionIA?.momento_dia || extraerMomentoDelDia(mensaje);
+  const servicioDetectadoEnMensaje = detectarServicio(mensaje, barberia.servicios || []);
+  const profesionalDetectadoEnMensaje = detectarProfesional(mensaje, barberia.barberos || []);
+  const servicioInferido = extraccionIA?.servicio || servicioDetectadoEnMensaje?.nombre || null;
+  const profesionalInferido = extraccionIA?.profesional || profesionalDetectadoEnMensaje?.nombre || null;
+  const fechaInferida = extraccionIA?.fecha_preferida || fechaDetectadaEnMensaje;
+  const horaInferida = extraccionIA?.hora_preferida || horaDetectadaEnMensaje;
 
   if (sesion.estado === "inicio" && !tieneIntencionTurno(mensaje)) {
     return { ignored: true, reason: "sin_intencion_turno" };
@@ -356,9 +547,8 @@ async function procesarRecepcionWhatsapp({ barberia_id, from, text }) {
     at: new Date().toISOString()
   });
 
-  const fechaDetectadaEnMensaje = resolverFechaPreferida(mensaje);
-  if (fechaDetectadaEnMensaje && fechaDetectadaEnMensaje !== sesion.fecha_preferida) {
-    sesion.fecha_preferida = fechaDetectadaEnMensaje;
+  if (fechaInferida && fechaInferida !== fechaAnterior) {
+    sesion.fecha_preferida = fechaInferida;
     resetearDisponibilidad(sesion);
   }
 
@@ -368,16 +558,17 @@ async function procesarRecepcionWhatsapp({ barberia_id, from, text }) {
   if (sesion.estado === "inicio") {
     sesion.estado = "recopilando";
   } else if (!sesion.nombre) {
-    sesion.nombre = mensaje;
+    if (!servicioInferido && !fechaInferida && !horaInferida && !profesionalInferido) {
+      sesion.nombre = mensaje;
+    }
   } else if (!sesion.servicio) {
-    const servicioDetectado = detectarServicio(mensaje, barberia.servicios || []);
-    if (servicioDetectado) {
-      sesion.servicio = servicioDetectado.nombre;
+    if (servicioInferido) {
+      sesion.servicio = servicioInferido;
     } else {
       aclaracionDisponibilidad = `No llegue a identificar el servicio. Decime uno de estos: ${listarServicios(barberia)}.`;
     }
   } else if (!sesion.fecha_preferida) {
-    sesion.fecha_preferida = resolverFechaPreferida(mensaje);
+    sesion.fecha_preferida = fechaInferida;
   } else if (!sesion.hora_preferida) {
     const opcionElegida = elegirOpcionDisponible(mensaje, sesion.opcionesDisponibles || []);
     if (opcionElegida) {
@@ -386,7 +577,7 @@ async function procesarRecepcionWhatsapp({ barberia_id, from, text }) {
       sesion.horaPendiente = null;
       sesion.disponibilidadValidada = true;
     } else {
-      const horaDetectada = extraerHora(mensaje);
+      const horaDetectada = horaInferida;
       const opcionPorBarberoPendiente = !horaDetectada && sesion.horaPendiente
         ? (sesion.opcionesDisponibles || []).find((opcion) =>
             opcion.hora === sesion.horaPendiente &&
@@ -405,9 +596,15 @@ async function procesarRecepcionWhatsapp({ barberia_id, from, text }) {
           aclaracionDisponibilidad = `A las ${horaDetectada} estan disponibles: ${opcionesMismaHora.map((opcion) => opcion.barbero).join(", ")}. Decime con cual barbero queres ese horario.`;
         } else if (horaDetectada && opcionesMismaHora.length === 0 && (sesion.opcionesDisponibles || []).length) {
           aclaracionDisponibilidad = `Ese horario no aparece disponible para la fecha elegida. Estas son las opciones:\n\n${formatearOpcionesDisponibles(sesion.opcionesDisponibles)}\n\nDecime uno de esos horarios.`;
+        } else if (!horaDetectada && momentoDetectadoEnMensaje && (sesion.opcionesDisponibles || []).length) {
+          const opcionesPorMomento = filtrarOpcionesPorMomento(sesion.opcionesDisponibles, momentoDetectadoEnMensaje);
+          aclaracionDisponibilidad = opcionesPorMomento.length
+            ? `Para ${momentoDetectadoEnMensaje === "tarde" ? "la tarde" : "la manana"} tengo estos horarios:\n\n${formatearOpcionesDisponibles(opcionesPorMomento)}\n\nDecime uno de esos horarios.`
+            : `Para ${momentoDetectadoEnMensaje === "tarde" ? "la tarde" : "la manana"} no veo lugares libres en esa fecha. Si queres, te muestro otro dia.`;
         } else {
-          sesion.hora_preferida = horaDetectada || mensaje;
-          sesion.disponibilidadValidada = false;
+          aclaracionDisponibilidad = (sesion.opcionesDisponibles || []).length
+            ? `Decime uno de los horarios disponibles o una franja como "por la tarde".`
+            : `Decime un horario para esa fecha.`;
         }
       }
     }
@@ -417,7 +614,7 @@ async function procesarRecepcionWhatsapp({ barberia_id, from, text }) {
 
   let pregunta = aclaracionDisponibilidad || siguientePregunta(sesion);
 
-  if (!aclaracionDisponibilidad && !sesion.servicio && pregunta) {
+  if (!aclaracionDisponibilidad && sesion.nombre && !sesion.servicio && pregunta) {
     const serviciosDisponibles = listarServicios(barberia);
     if (serviciosDisponibles) {
       pregunta = `Gracias ${sesion.nombre}. Que servicio queres hacerte? Tengo: ${serviciosDisponibles}.`;
@@ -484,13 +681,48 @@ async function procesarRecepcionWhatsapp({ barberia_id, from, text }) {
   return asyncLocalStorage.run({ barberia_id, mode: "wwebjs" }, async () => {
     const destino = resolverDestinoWhatsapp(from);
     if (pregunta) {
+      console.log("[recepcion] respuesta_intermedia:", JSON.stringify({
+        nombre: sesion.nombre,
+        servicio: sesion.servicio,
+        profesional: sesion.profesional,
+        fecha_preferida: sesion.fecha_preferida,
+        hora_preferida: sesion.hora_preferida,
+        pregunta
+      }));
       await enviarMensaje(destino, pregunta);
       return { completed: false };
+    }
+
+    if (!solicitudListaParaGuardar(sesion)) {
+      const preguntaFinal = !normalizarNombrePropio(sesion.nombre)
+        ? "Antes de seguir, decime tu nombre y apellido."
+        : !sesion.servicio
+          ? `Decime que servicio queres hacerte. Tengo: ${listarServicios(barberia)}.`
+          : !sesion.fecha_preferida
+            ? "Decime para que dia queres el turno."
+            : "Decime el horario que preferis.";
+
+      sesiones.set(userKey, sesion);
+      console.log("[recepcion] guardado_bloqueado:", JSON.stringify({
+        nombre: sesion.nombre,
+        servicio: sesion.servicio,
+        fecha_preferida: sesion.fecha_preferida,
+        hora_preferida: sesion.hora_preferida
+      }));
+      await enviarMensaje(destino, preguntaFinal);
+      return { completed: false, blocked: true };
     }
 
     await guardarSolicitud({ barberia_id, telefono, sesion });
     sesion.solicitudGuardada = true;
     sesiones.set(userKey, sesion);
+    console.log("[recepcion] solicitud_guardada:", JSON.stringify({
+      nombre: sesion.nombre,
+      servicio: sesion.servicio,
+      profesional: sesion.profesional,
+      fecha_preferida: sesion.fecha_preferida,
+      hora_preferida: sesion.hora_preferida
+    }));
 
     await enviarMensaje(
       destino,
