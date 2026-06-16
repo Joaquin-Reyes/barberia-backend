@@ -294,7 +294,10 @@ function solicitudListaParaGuardar(sesion) {
   );
 }
 
-function extraerDatosLibres(texto, sesion, barberia) {
+function extraerDatosLibres(texto, sesion, barberia, opciones = {}) {
+  const evitarProfesional = opciones.evitarProfesional === true;
+  const evitarServicio = opciones.evitarServicio === true;
+
   if (!sesion.nombre) {
     const nombreMatch = String(texto || "").match(/\b(?:soy|me llamo|mi nombre es)\s+([a-zA-Z\u00C0-\u017F\s]{2,40})/i);
     if (nombreMatch) sesion.nombre = nombreMatch[1].trim();
@@ -308,12 +311,12 @@ function extraerDatosLibres(texto, sesion, barberia) {
     sesion.fecha_preferida = resolverFechaPreferida(texto);
   }
 
-  if (!sesion.servicio) {
+  if (!sesion.servicio && !evitarServicio) {
     const servicioDetectado = detectarServicio(texto, barberia.servicios || []);
     if (servicioDetectado) sesion.servicio = servicioDetectado.nombre;
   }
 
-  if (!sesion.profesional) {
+  if (!sesion.profesional && !evitarProfesional) {
     const profesionalDetectado = detectarProfesional(texto, barberia.barberos || []);
     if (profesionalDetectado) sesion.profesional = profesionalDetectado.nombre;
   }
@@ -342,6 +345,16 @@ function detectarProfesional(texto, barberos) {
       normalizado.includes(`con ${nombre}`)
     );
   }) || null;
+}
+
+function pareceNombreDePersona(texto) {
+  const nombre = normalizarNombrePropio(texto);
+  if (!nombre) return false;
+
+  const palabras = nombre.split(" ").filter(Boolean);
+  if (palabras.length < 2) return false;
+
+  return palabras.every((palabra) => /^[a-zA-Z\u00C0-\u017F]{2,}$/.test(palabra));
 }
 
 function listarServicios(barberia) {
@@ -552,14 +565,20 @@ async function procesarRecepcionWhatsapp({ barberia_id, from, text }) {
     resetearDisponibilidad(sesion);
   }
 
-  extraerDatosLibres(mensaje, sesion, barberia);
+  const esperandoNombre = !sesion.nombre;
+  extraerDatosLibres(mensaje, sesion, barberia, {
+    evitarProfesional: esperandoNombre,
+    evitarServicio: esperandoNombre
+  });
   let aclaracionDisponibilidad = null;
 
   if (sesion.estado === "inicio") {
     sesion.estado = "recopilando";
   } else if (!sesion.nombre) {
-    if (!servicioInferido && !fechaInferida && !horaInferida && !profesionalInferido) {
-      sesion.nombre = mensaje;
+    if (pareceNombreDePersona(mensaje)) {
+      sesion.nombre = normalizarNombrePropio(mensaje);
+    } else if (!servicioInferido && !fechaInferida && !horaInferida && !profesionalInferido) {
+      sesion.nombre = normalizarNombrePropio(mensaje);
     }
   } else if (!sesion.servicio) {
     if (servicioInferido) {
