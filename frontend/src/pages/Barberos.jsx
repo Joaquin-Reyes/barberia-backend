@@ -42,7 +42,8 @@ export default function Barberos({ user }) {
   const traerBarberos = useCallback(async () => {
     const { data } = await supabase
       .from("barberos").select("*")
-      .eq("barberia_id", user.barberia_id);
+      .eq("barberia_id", user.barberia_id)
+      .order("nombre", { ascending: true });
     setBarberos(data || []);
   }, [user?.barberia_id]);
 

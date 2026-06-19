@@ -14,7 +14,8 @@ export default function Configuracion({ user }) {
   const traerServicios = useCallback(async () => {
     const { data } = await supabase
       .from("servicios").select("*")
-      .eq("barberia_id", barberiaId);
+      .eq("barberia_id", barberiaId)
+      .order("nombre", { ascending: true });
     setServicios(data || []);
   }, [barberiaId]);
 

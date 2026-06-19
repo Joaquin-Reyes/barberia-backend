@@ -36,6 +36,7 @@ export default function Facturacion({ user }) {
       .from("barberos")
       .select("nombre, es_duenio")
       .eq("barberia_id", barberiaId)
+      .order("nombre", { ascending: true })
       .then(({ data }) => setBarberos(data || []));
   }, [barberiaId]);
 
@@ -58,7 +59,12 @@ export default function Facturacion({ user }) {
     }
 
     const { data } = await query;
-    setTurnos(data || []);
+    const turnosOrdenados = [...(data || [])].sort((a, b) =>
+      String(a.fecha || "").localeCompare(String(b.fecha || "")) ||
+      String(a.hora || "").localeCompare(String(b.hora || "")) ||
+      String(a.nombre || "").localeCompare(String(b.nombre || ""))
+    );
+    setTurnos(turnosOrdenados);
   }, [barberiaId, fechaFiltro, periodo]);
 
   useEffect(() => {

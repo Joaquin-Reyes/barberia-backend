@@ -35,7 +35,10 @@ export default function SuperAdminPanel({ user, onLogout }) {
       mostrarToast(data.error || "Error trayendo barberías", "error");
       return;
     }
-    setBarberias(data || []);
+    const barberiasOrdenadas = [...(data || [])].sort((a, b) =>
+      String(a.nombre || "").localeCompare(String(b.nombre || ""))
+    );
+    setBarberias(barberiasOrdenadas);
   }, [mostrarToast]);
 
   useEffect(() => {

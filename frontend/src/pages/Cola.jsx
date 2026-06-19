@@ -38,8 +38,15 @@ export default function Cola({ user }) {
       });
       if (!res.ok) throw new Error("Error al cargar cola");
       const data = await res.json();
-      setBarberos(data.barberos || []);
-      setColaEspera(data.cola_espera || []);
+      const barberosOrdenados = [...(data.barberos || [])].sort((a, b) =>
+        String(a.nombre || "").localeCompare(String(b.nombre || ""))
+      );
+      const colaOrdenada = [...(data.cola_espera || [])].sort((a, b) =>
+        Number(a.posicion || 0) - Number(b.posicion || 0) ||
+        String(a.hora_llegada || "").localeCompare(String(b.hora_llegada || ""))
+      );
+      setBarberos(barberosOrdenados);
+      setColaEspera(colaOrdenada);
     } catch (err) {
       console.error(err);
       mostrarToast("Error al cargar la cola", "error");

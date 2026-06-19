@@ -30,14 +30,16 @@ export default function Turnos({ user }) {
   const traerBarberos = useCallback(async () => {
     const { data } = await supabase
       .from("barberos").select("*")
-      .eq("barberia_id", barberiaId);
+      .eq("barberia_id", barberiaId)
+      .order("nombre", { ascending: true });
     setBarberos(data || []);
   }, [barberiaId]);
 
   const traerServicios = useCallback(async () => {
     const { data } = await supabase
       .from("servicios").select("*")
-      .eq("barberia_id", barberiaId);
+      .eq("barberia_id", barberiaId)
+      .order("nombre", { ascending: true });
     setServicios(data || []);
   }, [barberiaId]);
 
