@@ -12,6 +12,7 @@ import WhatsApp from './pages/WhatsApp'
 import SolicitudesWhatsApp from './pages/SolicitudesWhatsApp'
 import Cola from './pages/Cola'
 import PanelBarbero from './pages/PanelBarbero'
+import PwaUpdater from './components/PwaUpdater'
 import { supabase } from './lib/supabase'
 import './styles.css'
 
@@ -74,7 +75,12 @@ function App() {
   }, [esInvite])
 
   if (esInvite || window.location.pathname === '/set-password') {
-    return <SetPassword />
+    return (
+      <>
+        <SetPassword />
+        <PwaUpdater />
+      </>
+    )
   }
 
   if (cargando) {
@@ -86,7 +92,12 @@ function App() {
   }
 
   if (!user) {
-    return <Login onLogin={setUser} />
+    return (
+      <>
+        <Login onLogin={setUser} />
+        <PwaUpdater />
+      </>
+    )
   }
 
   const handleLogout = async () => {
@@ -96,32 +107,40 @@ function App() {
   }
 
   if (user.rol === 'superadmin') {
-    return <SuperAdminPanel user={user} onLogout={handleLogout} />
+    return (
+      <>
+        <SuperAdminPanel user={user} onLogout={handleLogout} />
+        <PwaUpdater />
+      </>
+    )
   }
 
   const defaultRoute = user.rol === 'barbero' ? 'panel-barbero' : 'turnos'
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Dashboard user={user} onLogout={handleLogout} />}>
-          <Route index element={<Navigate to={defaultRoute} replace />} />
-          <Route path="turnos" element={<Turnos user={user} onLogout={handleLogout} />} />
-          <Route path="barberos" element={<Barberos user={user} />} />
-          <Route path="facturacion" element={<Facturacion user={user} />} />
-          <Route path="whatsapp" element={<WhatsApp user={user} />} />
-          <Route path="solicitudes-whatsapp" element={<SolicitudesWhatsApp user={user} />} />
-          <Route path="configuracion" element={<Configuracion user={user} />} />
-          {user.rol !== 'barbero' && (
-            <Route path="cola" element={<Cola user={user} />} />
-          )}
-          {user.rol === 'barbero' && (
-            <Route path="panel-barbero" element={<PanelBarbero user={user} />} />
-          )}
-        </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Dashboard user={user} onLogout={handleLogout} />}>
+            <Route index element={<Navigate to={defaultRoute} replace />} />
+            <Route path="turnos" element={<Turnos user={user} onLogout={handleLogout} />} />
+            <Route path="barberos" element={<Barberos user={user} />} />
+            <Route path="facturacion" element={<Facturacion user={user} />} />
+            <Route path="whatsapp" element={<WhatsApp user={user} />} />
+            <Route path="solicitudes-whatsapp" element={<SolicitudesWhatsApp user={user} />} />
+            <Route path="configuracion" element={<Configuracion user={user} />} />
+            {user.rol !== 'barbero' && (
+              <Route path="cola" element={<Cola user={user} />} />
+            )}
+            {user.rol === 'barbero' && (
+              <Route path="panel-barbero" element={<PanelBarbero user={user} />} />
+            )}
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+      <PwaUpdater />
+    </>
   )
 }
 

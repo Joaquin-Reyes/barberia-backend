@@ -20,6 +20,8 @@ const superadminRoutes = require("./routes/superadmin.routes");
 const whatsappRoutes = require("./routes/whatsapp.routes");
 const colaRoutes = require("./routes/cola.routes");
 const barberoRoutes = require("./routes/barbero.routes");
+const facturacionRoutes = require("./routes/facturacion.routes");
+const pagosRoutes = require("./routes/pagos.routes");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -71,6 +73,13 @@ app.use("/superadmin", superadminRoutes);
 app.use("/webhook", whatsappRoutes);
 app.use("/cola", colaRoutes);
 app.use("/barbero", barberoRoutes);
+app.use("/api/facturacion", facturacionRoutes);
+app.use("/api/pagos", pagosRoutes);
+
+app.use((err, req, res, next) => {
+  console.error("API ERROR:", err);
+  res.status(500).json({ error: err.message || "Error interno" });
+});
 
 // Catch-all: serve React app for any non-API route
 app.use((req, res) => {
