@@ -1162,6 +1162,32 @@ tr:hover td {
   box-shadow: none;
 }
 
+.turnos-table table {
+  table-layout: fixed;
+  min-width: 0;
+}
+
+.turnos-table th,
+.turnos-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.turnos-table input,
+.turnos-table select {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.turno-row-editing td {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+.turno-edit-hide {
+  display: none;
+}
+
 @media (max-width: 760px) {
   .turno-pagos-summary,
   .turno-pagos-form,
@@ -1170,5 +1196,11 @@ tr:hover td {
   }
   .turno-pagos-head {
     align-items: flex-start;
+  }
+  .turnos-table th:nth-child(4),
+  .turnos-table td:nth-child(4),
+  .turnos-table th:nth-child(5),
+  .turnos-table td:nth-child(5) {
+    display: none;
   }
 }

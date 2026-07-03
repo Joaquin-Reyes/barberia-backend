@@ -742,7 +742,7 @@ export default function Turnos({ user }) {
             )}
           </div>
 
-          <div className="table-container">
+          <div className="table-container turnos-table">
             <table>
               <thead>
                 <tr>
@@ -769,13 +769,13 @@ export default function Turnos({ user }) {
                 {turnosFiltrados.map((t) => {
                   const enEdicion = editando.id === t.id;
                   const valores = enEdicion ? editando.valores : null;
-                  const inputStyle = { width: "100%", minWidth: 110, padding: "6px 8px", fontSize: 14 };
+                  const inputStyle = { width: "100%", minWidth: 0, maxWidth: "100%", padding: "6px 7px", fontSize: 13, margin: 0 };
                   const pagoInfo = pagosPorTurno[t.id];
                   const pagoAbierto = turnoPagosAbierto === t.id;
 
                   return (
                     <Fragment key={t.id}>
-                    <tr className="group">
+                    <tr className={`group${enEdicion ? " turno-row-editing" : ""}`}>
                       <td>
                         {enEdicion ? (
                           <input
@@ -850,7 +850,7 @@ export default function Turnos({ user }) {
                             step="1800"
                             value={valores.hora}
                             onChange={(e) => actualizarEdicion("hora", e.target.value)}
-                            style={{ ...inputStyle, minWidth: 96 }}
+                            style={inputStyle}
                           />
                         ) : normHora(t.hora)}
                       </td>
@@ -880,7 +880,7 @@ export default function Turnos({ user }) {
                         )}
                       </td>
                       {puedeAdministrarTurnos && (
-                        <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+                        <td className={enEdicion ? "turno-edit-hide" : ""} style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
                           {money(enEdicion ? (servicios.find((s) => s.nombre === valores.servicio)?.precio ?? t.precio) : (pagoInfo?.total_cobrable ?? t.precio))}
                           {pagoInfo?.total_productos > 0 && (
                             <div style={{ fontSize: 11, color: "#64748B", fontWeight: 400 }}>
@@ -890,7 +890,7 @@ export default function Turnos({ user }) {
                         </td>
                       )}
                       {puedeAdministrarTurnos && (
-                        <td>
+                        <td className={enEdicion ? "turno-edit-hide" : ""}>
                           <div style={{ display: "grid", gap: 4 }}>
                             <PagoBadge estado={pagoInfo?.estado_pago} />
                             {pagoInfo && (
