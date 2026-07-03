@@ -580,6 +580,12 @@ export default function Turnos({ user }) {
     traerTurnos();
   }
 
+  async function eliminarTurno(turno) {
+    if (!window.confirm(`Eliminar el turno de ${turno.nombre}?`)) return;
+    await supabase.from("turnos").delete().eq("id", turno.id);
+    traerTurnos();
+  }
+
   const pendientes  = turnos.filter(t => t.estado === "pendiente").length;
   const confirmados = turnos.filter(t => t.estado === "confirmado").length;
   const completados = turnos.filter(t => t.estado === "completado").length;
@@ -740,6 +746,138 @@ export default function Turnos({ user }) {
                 Limpiar
               </button>
             )}
+          </div>
+
+          <div className="turnos-mobile-list">
+            {turnosFiltrados.length === 0 ? (
+              <div className="turno-mobile-empty">No hay turnos para mostrar</div>
+            ) : turnosFiltrados.map((t) => {
+              const enEdicion = editando.id === t.id;
+              const valores = enEdicion ? editando.valores : null;
+              const pagoInfo = pagosPorTurno[t.id];
+              const pagoAbierto = turnoPagosAbierto === t.id;
+              const precioActual = enEdicion
+                ? (servicios.find((s) => s.nombre === valores.servicio)?.precio ?? t.precio)
+                : (pagoInfo?.total_cobrable ?? t.precio);
+
+              return (
+                <div className="turno-mobile-card" key={t.id}>
+                  {enEdicion ? (
+                    <div className="turno-mobile-edit">
+                      <input
+                        autoFocus
+                        value={valores.nombre}
+                        onChange={(e) => actualizarEdicion("nombre", e.target.value)}
+                        placeholder="Cliente"
+                      />
+                      <input
+                        value={valores.telefono}
+                        onChange={(e) => actualizarEdicion("telefono", e.target.value)}
+                        placeholder="Telefono"
+                      />
+                      <select value={valores.servicio} onChange={(e) => actualizarEdicion("servicio", e.target.value)}>
+                        <option value="">Sin servicio</option>
+                        {servicios.map((s) => (
+                          <option key={s.id} value={s.nombre}>
+                            {s.nombre} - ${s.precio.toLocaleString("es-AR")}
+                          </option>
+                        ))}
+                      </select>
+                      <select value={valores.barbero} onChange={(e) => actualizarEdicion("barbero", e.target.value)}>
+                        <option value="">Sin asignar</option>
+                        {barberos.map((b) => <option key={b.id} value={b.nombre}>{b.nombre}</option>)}
+                      </select>
+                      <div className="turno-mobile-edit-row">
+                        <input type="date" value={valores.fecha} onChange={(e) => actualizarEdicion("fecha", e.target.value)} />
+                        <input type="time" step="1800" value={valores.hora} onChange={(e) => actualizarEdicion("hora", e.target.value)} />
+                      </div>
+                      <select value={valores.estado} onChange={(e) => actualizarEdicion("estado", e.target.value)}>
+                        <option value="pendiente">pendiente</option>
+                        <option value="confirmado">confirmado</option>
+                        <option value="completado">completado</option>
+                        <option value="cancelado">cancelado</option>
+                      </select>
+                      <div className="turno-mobile-actions">
+                        <button onClick={guardarEdicionFila} aria-label="Guardar turno">
+                          <Check size={14} /> Guardar
+                        </button>
+                        <button onClick={() => setEditando({ id: null, valores: null })} className="btn-delete" aria-label="Cancelar edicion">
+                          <X size={14} /> Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="turno-mobile-head">
+                        <div>
+                          <strong>{t.nombre}</strong>
+                          <span>{t.servicio || "Sin servicio"} - {t.barbero || "Sin asignar"}</span>
+                        </div>
+                        <span
+                          className={`estado ${t.estado || "pendiente"}`}
+                          onClick={() => {
+                            const orden = ["pendiente", "confirmado", "completado"];
+                            const index = orden.indexOf(t.estado || "pendiente");
+                            cambiarEstado(t.id, orden[(index + 1) % orden.length]);
+                          }}
+                        >
+                          {t.estado || "pendiente"}
+                        </span>
+                      </div>
+
+                      <div className="turno-mobile-meta">
+                        <span>{t.fecha}</span>
+                        <span>{normHora(t.hora)}</span>
+                        <span>{t.telefono || "Sin telefono"}</span>
+                      </div>
+
+                      {puedeAdministrarTurnos && (
+                        <div className="turno-mobile-billing">
+                          <div>
+                            <small>Total</small>
+                            <strong>{money(precioActual)}</strong>
+                            {pagoInfo?.total_productos > 0 && <span>Incluye productos</span>}
+                          </div>
+                          <div>
+                            <small>Pago</small>
+                            <PagoBadge estado={pagoInfo?.estado_pago} />
+                            {pagoInfo && <span>{money(pagoInfo.total_pagado)} / saldo {money(pagoInfo.saldo)}</span>}
+                          </div>
+                        </div>
+                      )}
+
+                      {puedeAdministrarTurnos && (
+                        <div className="turno-mobile-actions">
+                          <button
+                            onClick={() => setTurnoPagosAbierto(pagoAbierto ? null : t.id)}
+                            aria-label="Ver pagos del turno"
+                          >
+                            <WalletCards size={14} /> Pagos
+                          </button>
+                          <button onClick={() => iniciarEdicionFila(t)} aria-label="Editar turno">
+                            <Pencil size={14} /> Editar
+                          </button>
+                          <button onClick={() => eliminarTurno(t)} className="btn-delete" aria-label="Eliminar turno">
+                            <X size={14} /> Eliminar
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {puedeAdministrarTurnos && pagoAbierto && (
+                    <PagosPanel
+                      turno={t}
+                      onChanged={() => {
+                        cargarEstadosPago(turnos);
+                        traerTurnos();
+                      }}
+                      onToast={mostrarToast}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           <div className="table-container turnos-table">

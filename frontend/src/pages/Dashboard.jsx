@@ -17,6 +17,29 @@ const barberoNavItems = [
   { to: 'panel-barbero', label: 'Mi Panel', icon: Scissors },
 ]
 
+function BottomNav({ items, onMenuOpen }) {
+  const primaryItems = items.slice(0, 3)
+
+  return (
+    <nav className="bottom-nav">
+      {primaryItems.map(({ to, label, icon: Icon }) => (
+        <NavLink
+          key={to}
+          to={to}
+          className={({ isActive }) => `bottom-nav-item${isActive ? ' active' : ''}`}
+        >
+          <Icon size={20} strokeWidth={1.7} />
+          <span>{label}</span>
+        </NavLink>
+      ))}
+      <button className="bottom-nav-item" onClick={onMenuOpen} type="button">
+        <Menu size={20} strokeWidth={1.7} />
+        <span>Mas</span>
+      </button>
+    </nav>
+  )
+}
+
 function Dashboard({ user, onLogout }) {
   const navItems = user?.rol === 'barbero' ? barberoNavItems : adminNavItems
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -128,34 +151,23 @@ function Dashboard({ user, onLogout }) {
         </div>
       </main>
 
-      <div className="mobile-bottom-menu sm:hidden">
-        <button
-          onClick={() => setDrawerOpen(true)}
-          className="mobile-bottom-menu-button"
-          aria-label="Abrir menu"
-        >
-          <Menu size={30} />
-        </button>
-      </div>
+      <BottomNav items={navItems} onMenuOpen={() => setDrawerOpen(true)} />
 
       {/* ─── Overlay ─── */}
       {drawerOpen && (
         <div
-          className="fixed inset-0 z-40 sm:hidden"
-          style={{ background: 'rgba(0,0,0,0.45)' }}
+          className="drawer-overlay"
           onClick={closeDrawer}
         />
       )}
 
       {/* ─── Drawer lateral mobile ─── */}
       <div
-        className="fixed top-0 left-0 h-full sm:hidden z-50 flex flex-col"
+        className="drawer"
         style={{
-          width: 260,
-          background: '#0F172A',
-          transform: drawerOpen ? 'translateX(0)' : 'translateX(-100%)',
+          transform: drawerOpen ? 'translateY(0)' : 'translateY(110%)',
           transition: 'transform 0.25s ease',
-          boxShadow: drawerOpen ? '4px 0 24px rgba(0,0,0,0.35)' : 'none',
+          boxShadow: drawerOpen ? '0 -18px 40px rgba(15,23,42,0.24)' : 'none',
         }}
       >
         {/* Header drawer */}
