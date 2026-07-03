@@ -1024,6 +1024,24 @@ tr:hover td {
   background: #fff;
 }
 
+.fact-reparto-total {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(120px, auto) minmax(120px, auto);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #BFDBFE;
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--primary-subtle);
+  color: #1E40AF;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fact-reparto-total > span:not(:first-child) {
+  text-align: right;
+}
+
 .fact-reparto-main,
 .fact-reparto-split {
   display: grid;
@@ -1114,7 +1132,8 @@ tr:hover td {
   .fact-reparto-head,
   .fact-reparto-summary,
   .fact-reparto-main,
-  .fact-reparto-split {
+  .fact-reparto-split,
+  .fact-reparto-total {
     grid-template-columns: 1fr;
   }
   .fact-reparto-head {
@@ -1124,7 +1143,8 @@ tr:hover td {
     width: fit-content;
   }
   .fact-reparto-main > strong,
-  .fact-reparto-split > span:nth-child(3) {
+  .fact-reparto-split > span:nth-child(3),
+  .fact-reparto-total > span:not(:first-child) {
     text-align: left;
   }
 }

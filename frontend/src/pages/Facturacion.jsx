@@ -261,6 +261,11 @@ function RepartoBarberos({ rows, total }) {
                 </div>
               )
             })}
+            <div className="fact-reparto-total">
+              <span>Total reparto</span>
+              <span>Barberos <strong>{money(totalBarberos)}</strong></span>
+              <span>Barberia <strong>{money(totalBarberia)}</strong></span>
+            </div>
           </div>
         </>
       )}
