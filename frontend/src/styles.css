@@ -962,6 +962,114 @@ tr:hover td {
   grid-template-columns: minmax(82px, 110px) minmax(130px, 1fr) minmax(82px, 100px) 98px;
 }
 
+.fact-reparto-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.fact-reparto-head .fact-section-title {
+  margin-bottom: 0;
+}
+
+.fact-reparto-head > span {
+  color: var(--text-secondary);
+  font-size: 12px;
+  background: #F8FAFC;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+
+.fact-reparto-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.fact-reparto-summary > div {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  background: #F8FAFC;
+}
+
+.fact-reparto-summary small,
+.fact-reparto-split,
+.fact-reparto-main > span:last-child {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.fact-reparto-summary strong {
+  display: block;
+  color: var(--text);
+  font-size: 20px;
+  margin-top: 2px;
+}
+
+.fact-reparto-list {
+  display: grid;
+  gap: 10px;
+}
+
+.fact-reparto-row {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.fact-reparto-main,
+.fact-reparto-split {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(80px, 110px) minmax(92px, 120px);
+  gap: 8px;
+  align-items: center;
+}
+
+.fact-reparto-main strong {
+  color: var(--text);
+}
+
+.fact-reparto-main em {
+  display: inline-flex;
+  margin-left: 6px;
+  color: #1D4ED8;
+  background: var(--primary-subtle);
+  border: 1px solid #BFDBFE;
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.fact-reparto-main > strong,
+.fact-reparto-split > span:nth-child(3) {
+  text-align: right;
+}
+
+.fact-reparto-bar {
+  height: 8px;
+  overflow: hidden;
+  background: #E2E8F0;
+  border-radius: 999px;
+  margin: 9px 0;
+}
+
+.fact-reparto-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2563EB, #16A34A);
+}
+
 .danger { color: #B91C1C !important; }
 
 .danger-button {
@@ -1002,6 +1110,22 @@ tr:hover td {
   .fact-list-row > span:first-child { white-space: normal; }
   .fact-close-control {
     grid-template-columns: 1fr 1fr;
+  }
+  .fact-reparto-head,
+  .fact-reparto-summary,
+  .fact-reparto-main,
+  .fact-reparto-split {
+    grid-template-columns: 1fr;
+  }
+  .fact-reparto-head {
+    display: grid;
+  }
+  .fact-reparto-head > span {
+    width: fit-content;
+  }
+  .fact-reparto-main > strong,
+  .fact-reparto-split > span:nth-child(3) {
+    text-align: left;
   }
 }
 

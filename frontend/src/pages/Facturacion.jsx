@@ -13,9 +13,11 @@ import {
   XCircle,
 } from 'lucide-react'
 import { facturacion as facturacionApi, pagos as pagosApi } from '../lib/api.js'
+import { supabase } from '../lib/supabase.js'
 
 const METODOS = ['efectivo', 'transferencia', 'mercado_pago', 'tarjeta', 'otro']
 const TIPOS = ['pago_total', 'sena', 'parcial', 'ajuste']
+const REPARTO_BARBERO = 0.5
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -179,6 +181,88 @@ function Ranking({ title, Icon, rows, nameLabel, countLabel = 'Pagos', countKey 
             </div>
           ))}
         </div>
+      )}
+    </section>
+  )
+}
+
+function buildRepartoBarberos(rows = [], esDuenioMap = {}) {
+  return rows.map((row) => {
+    const total = Number(row.total || 0)
+    const esDuenio = Boolean(esDuenioMap[row.nombre])
+    const paraBarbero = esDuenio ? 0 : Math.round(total * REPARTO_BARBERO)
+    const paraBarberia = esDuenio ? total : total - paraBarbero
+    return {
+      ...row,
+      total,
+      esDuenio,
+      paraBarbero,
+      paraBarberia,
+    }
+  })
+}
+
+function RepartoBarberos({ rows, total }) {
+  const totalBarberos = rows.reduce((sum, row) => sum + row.paraBarbero, 0)
+  const totalBarberia = rows.reduce((sum, row) => sum + row.paraBarberia, 0)
+  const maxTotal = Math.max(...rows.map((row) => row.total), 1)
+
+  return (
+    <section className="fact-panel fact-reparto">
+      <div className="fact-reparto-head">
+        <div className="fact-section-title">
+          <Scissors size={17} color="var(--primary)" />
+          <h2>Reparto por barbero</h2>
+        </div>
+        <span>50% barbero / 50% barberia</span>
+      </div>
+
+      {!rows.length ? (
+        <EmptyState text="No hay datos de barberos para este periodo." />
+      ) : (
+        <>
+          <div className="fact-reparto-summary">
+            <div>
+              <small>Total periodo</small>
+              <strong>{money(total)}</strong>
+            </div>
+            <div>
+              <small>Para barberos</small>
+              <strong>{money(totalBarberos)}</strong>
+            </div>
+            <div>
+              <small>Para barberia</small>
+              <strong>{money(totalBarberia)}</strong>
+            </div>
+          </div>
+
+          <div className="fact-reparto-list">
+            {rows.map((row) => {
+              const percent = total > 0 ? Math.round((row.total / total) * 100) : 0
+              const width = Math.max(4, Math.round((row.total / maxTotal) * 100))
+              return (
+                <div className="fact-reparto-row" key={row.id || row.nombre}>
+                  <div className="fact-reparto-main">
+                    <span>
+                      <strong>{labelText(row.nombre)}</strong>
+                      {row.esDuenio && <em>Duenio</em>}
+                    </span>
+                    <span>{row.pagos ?? row.turnos ?? 0} registros</span>
+                    <strong>{money(row.total)}</strong>
+                  </div>
+                  <div className="fact-reparto-bar">
+                    <span style={{ width: `${width}%` }} />
+                  </div>
+                  <div className="fact-reparto-split">
+                    <span>Barbero <strong>{row.esDuenio ? '-' : money(row.paraBarbero)}</strong></span>
+                    <span>Barberia <strong>{money(row.paraBarberia)}</strong></span>
+                    <span>{percent}% del total</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </>
       )}
     </section>
   )
@@ -418,12 +502,13 @@ function Movimientos({ rows, onAnular }) {
   )
 }
 
-export default function Facturacion() {
+export default function Facturacion({ user }) {
   const [desde, setDesde] = useState(monthStart)
   const [hasta, setHasta] = useState(today)
   const [data, setData] = useState(null)
   const [cajaData, setCajaData] = useState(null)
   const [turnosCobro, setTurnosCobro] = useState([])
+  const [barberos, setBarberos] = useState([])
   const [cierres, setCierres] = useState([])
   const [conteoMetodo, setConteoMetodo] = useState({})
   const [cierreNota, setCierreNota] = useState('')
@@ -463,6 +548,19 @@ export default function Facturacion() {
   useEffect(() => {
     cargar()
   }, [cargar])
+
+  useEffect(() => {
+    if (!user?.barberia_id) return
+    let alive = true
+    supabase
+      .from('barberos')
+      .select('nombre, es_duenio')
+      .eq('barberia_id', user.barberia_id)
+      .then(({ data: rows }) => {
+        if (alive) setBarberos(rows || [])
+      })
+    return () => { alive = false }
+  }, [user?.barberia_id])
 
   useEffect(() => {
     if (!cajaData?.por_metodo) return
@@ -604,6 +702,14 @@ export default function Facturacion() {
   const mejorBarbero = data?.mejor_barbero || data?.por_barbero?.[0]
   const totalProductos = data?.total_productos || cajaData?.total_productos || 0
   const movimientos = cajaData?.pagos || []
+  const esDuenioMap = useMemo(() => barberos.reduce((acc, barbero) => {
+    acc[barbero.nombre] = Boolean(barbero.es_duenio)
+    return acc
+  }, {}), [barberos])
+  const repartoBarberos = useMemo(
+    () => buildRepartoBarberos(data?.por_barbero || [], esDuenioMap),
+    [data?.por_barbero, esDuenioMap]
+  )
   const tabs = [
     { id: 'caja', label: 'Caja', sub: `${cajaData?.pagos_count || 0} pagos`, Icon: ClipboardCheck },
     { id: 'cobrar', label: 'Cobrar', sub: `${turnosCobro.filter((t) => t.estado_pago !== 'pagado').length} pendientes`, Icon: WalletCards },
@@ -661,6 +767,8 @@ export default function Facturacion() {
       {vista === 'cobrar' && <CobrarPanel turnos={turnosCobro} pagoForm={pagoForm} setPagoForm={setPagoForm} registrando={registrando} onRegistrar={registrarPago} />}
 
       {vista === 'analisis' && (
+        <>
+        <RepartoBarberos rows={repartoBarberos} total={total} />
         <div className="fact-grid">
           <Ranking title="Por barbero" Icon={Scissors} rows={data?.por_barbero || []} nameLabel="Barbero" countLabel={usaPagos ? 'Pagos' : 'Turnos'} countKey={usaPagos ? 'pagos' : 'turnos'} />
           <Ranking title="Por servicio" Icon={ReceiptText} rows={data?.por_servicio || []} nameLabel="Servicio" countLabel={usaPagos ? 'Pagos' : 'Turnos'} countKey={usaPagos ? 'pagos' : 'turnos'} />
@@ -669,6 +777,7 @@ export default function Facturacion() {
           {usaPagos && <Ranking title="Por producto" Icon={WalletCards} rows={data?.por_producto || cajaData?.por_producto || []} nameLabel="Producto" />}
           <Ranking title="Por día" Icon={CalendarCheck} rows={data?.por_dia || []} nameLabel="Día" countLabel={usaPagos ? 'Pagos' : 'Turnos'} countKey={usaPagos ? 'pagos' : 'turnos'} />
         </div>
+        </>
       )}
 
       {vista === 'movimientos' && <Movimientos rows={movimientos} onAnular={anularPago} />}
