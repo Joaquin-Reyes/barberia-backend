@@ -1,11 +1,226 @@
-import { useCallback, useEffect, useState } from "react";
-import { Check, Plus, Search, Pencil, X } from "lucide-react";
+import { Fragment, useCallback, useEffect, useState } from "react";
+import { Check, Plus, Search, Pencil, X, WalletCards, Trash2 } from "lucide-react";
 import { supabase, turnoDisponible, getAuthToken } from "../lib/supabase";
+import { pagos as pagosApi } from "../lib/api";
 
 const API = "https://barberia-backend-production-7dae.up.railway.app";
 
+const METODOS_PAGO = [
+  ["efectivo", "Efectivo"],
+  ["transferencia", "Transferencia"],
+  ["mercado_pago", "Mercado Pago"],
+  ["tarjeta", "Tarjeta"],
+  ["otro", "Otro"],
+];
+
+const TIPOS_PAGO = [
+  ["pago_total", "Pago total"],
+  ["sena", "Seña"],
+  ["parcial", "Parcial"],
+  ["ajuste", "Ajuste"],
+];
+
+function money(value) {
+  return `$${Number(value || 0).toLocaleString("es-AR")}`;
+}
+
+function labelText(value) {
+  return String(value || "-").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function PagoBadge({ estado }) {
+  const config = {
+    pagado: ["Pagado", "#DCFCE7", "#166534", "#BBF7D0"],
+    sena: ["Con seña", "#FEF3C7", "#92400E", "#FDE68A"],
+    parcial: ["Parcial", "#DBEAFE", "#1E40AF", "#BFDBFE"],
+    sin_pagar: ["Sin pagar", "#F1F5F9", "#475569", "#E2E8F0"],
+  }[estado || "sin_pagar"];
+
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "3px 9px",
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: 600,
+        background: config[1],
+        color: config[2],
+        border: `1px solid ${config[3]}`,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {config[0]}
+    </span>
+  );
+}
+
+function PagosPanel({ turno, onChanged, onToast }) {
+  const [data, setData] = useState(null);
+  const [form, setForm] = useState({
+    monto: turno?.precio || "",
+    metodo: "efectivo",
+    tipo: "pago_total",
+    nota: "",
+  });
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const cargar = useCallback(async () => {
+    if (!turno?.id) return;
+    setLoading(true);
+    setError("");
+    try {
+      const resumen = await pagosApi.byTurno(turno.id);
+      setData(resumen);
+      setForm((prev) => ({
+        ...prev,
+        monto: resumen?.saldo > 0 ? String(resumen.saldo) : prev.monto || String(turno.precio || ""),
+      }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [turno?.id, turno?.precio]);
+
+  useEffect(() => {
+    setData(null);
+    setForm({ monto: turno?.precio || "", metodo: "efectivo", tipo: "pago_total", nota: "" });
+    cargar();
+  }, [cargar, turno?.precio]);
+
+  function set(campo, valor) {
+    setForm((prev) => ({ ...prev, [campo]: valor }));
+  }
+
+  async function registrar(e) {
+    e.preventDefault();
+    setError("");
+    if (!Number(form.monto) || Number(form.monto) <= 0) {
+      setError("Ingresá un monto válido");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await pagosApi.create({
+        turno_id: turno.id,
+        monto: Number(form.monto),
+        metodo: form.metodo,
+        tipo: form.tipo,
+        nota: form.nota || undefined,
+      });
+      setForm((prev) => ({ ...prev, nota: "" }));
+      await cargar();
+      onChanged?.();
+      onToast?.("Pago registrado");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function anular(id) {
+    setError("");
+    try {
+      await pagosApi.anular(id, "Anulado desde turnos");
+      await cargar();
+      onChanged?.();
+      onToast?.("Pago anulado");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  const pagos = data?.pagos || [];
+  const activos = pagos.filter((p) => !p.anulado_at);
+  const estadoLabel = {
+    sin_pagar: "Sin pagar",
+    sena: "Con seña",
+    parcial: "Pago parcial",
+    pagado: "Pagado",
+  }[data?.estado_pago] || "Sin datos";
+
+  return (
+    <div className="turno-pagos-panel">
+      <div className="turno-pagos-head">
+        <div>
+          <div className="turno-pagos-title">
+            <WalletCards size={16} color="var(--primary)" />
+            <h3>Pagos de {turno.nombre}</h3>
+          </div>
+          <p>{turno.servicio || "Sin servicio"} · {turno.barbero || "Sin barbero"}</p>
+        </div>
+        <PagoBadge estado={data?.estado_pago} />
+      </div>
+
+      <div className="turno-pagos-summary">
+        <div>
+          <span>Pagado</span>
+          <strong>{loading ? "..." : money(data?.total_pagado)}</strong>
+        </div>
+        <div>
+          <span>Saldo</span>
+          <strong>{loading ? "..." : money(data?.saldo)}</strong>
+        </div>
+        <div>
+          <span>Estado</span>
+          <strong>{estadoLabel}</strong>
+        </div>
+      </div>
+
+      <form className="turno-pagos-form" onSubmit={registrar}>
+        <label>
+          Monto
+          <input type="number" min="1" step="0.01" value={form.monto} onChange={(e) => set("monto", e.target.value)} />
+        </label>
+        <label>
+          Método
+          <select value={form.metodo} onChange={(e) => set("metodo", e.target.value)}>
+            {METODOS_PAGO.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
+        <label>
+          Tipo
+          <select value={form.tipo} onChange={(e) => set("tipo", e.target.value)}>
+            {TIPOS_PAGO.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
+        <label>
+          Nota
+          <input value={form.nota} onChange={(e) => set("nota", e.target.value)} placeholder="Opcional" />
+        </label>
+        <button type="submit" disabled={saving}>{saving ? "Registrando..." : "Registrar pago"}</button>
+      </form>
+
+      {error && <div className="turno-pagos-error">{error}</div>}
+
+      <div className="turno-pagos-list">
+        {activos.length === 0 ? (
+          <p>No hay pagos registrados.</p>
+        ) : activos.map((pago) => (
+          <div className="turno-pago-row" key={pago.id}>
+            <span>
+              <strong>{money(pago.monto)}</strong>
+              <small>{labelText(pago.tipo)} · {labelText(pago.metodo)}</small>
+            </span>
+            <button type="button" className="turno-pago-delete" onClick={() => anular(pago.id)} aria-label="Anular pago">
+              <Trash2 size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Turnos({ user }) {
   const barberiaId = user?.barberia_id;
+  const rolUsuario = user?.rol;
   const [turnos, setTurnos] = useState([]);
   const [barberos, setBarberos] = useState([]);
   const [servicios, setServicios] = useState([]);
@@ -17,6 +232,31 @@ export default function Turnos({ user }) {
   const [busqueda, setBusqueda] = useState("");
   const [filtroFecha, setFiltroFecha] = useState("");
   const [editando, setEditando] = useState({ id: null, valores: null });
+  const [pagosPorTurno, setPagosPorTurno] = useState({});
+  const [turnoPagosAbierto, setTurnoPagosAbierto] = useState(null);
+
+  const cargarEstadosPago = useCallback(async (turnosBase = []) => {
+    if (!turnosBase.length) {
+      setPagosPorTurno({});
+      return;
+    }
+
+    const fechas = turnosBase.map((t) => t.fecha).filter(Boolean).sort();
+    const desde = fechas[0];
+    const hasta = fechas[fechas.length - 1];
+    if (!desde || !hasta) return;
+
+    if (!(rolUsuario === "admin" || rolUsuario === "superadmin")) return;
+
+    try {
+      const data = await pagosApi.turnos({ desde, hasta, todos: "1" });
+      const mapa = {};
+      for (const item of data || []) mapa[item.id] = item;
+      setPagosPorTurno(mapa);
+    } catch (err) {
+      console.warn("No se pudieron cargar estados de pago:", err);
+    }
+  }, [rolUsuario]);
 
   const traerTurnos = useCallback(async () => {
     const { data } = await supabase
@@ -24,8 +264,10 @@ export default function Turnos({ user }) {
       .eq("barberia_id", barberiaId)
       .order("fecha", { ascending: true })
       .order("hora", { ascending: true });
-    setTurnos(data || []);
-  }, [barberiaId]);
+    const list = data || [];
+    setTurnos(list);
+    await cargarEstadosPago(list);
+  }, [barberiaId, cargarEstadosPago]);
 
   const traerBarberos = useCallback(async () => {
     const { data } = await supabase
@@ -392,13 +634,15 @@ export default function Turnos({ user }) {
                   <th>Fecha</th>
                   <th>Hora</th>
                   <th>Estado</th>
-                  {(user.rol === "admin" || user.rol === "superadmin") && <th></th>}
+                  {puedeAdministrarTurnos && <th>Precio</th>}
+                  {puedeAdministrarTurnos && <th>Pago</th>}
+                  {puedeAdministrarTurnos && <th></th>}
                 </tr>
               </thead>
               <tbody>
                 {turnosFiltrados.length === 0 && (
                   <tr>
-                    <td colSpan={8} style={{ textAlign: "center", color: "#94A3B8", padding: "32px 0", fontStyle: "italic" }}>
+                    <td colSpan={puedeAdministrarTurnos ? 10 : 7} style={{ textAlign: "center", color: "#94A3B8", padding: "32px 0", fontStyle: "italic" }}>
                       No hay turnos para mostrar
                     </td>
                   </tr>
@@ -407,9 +651,12 @@ export default function Turnos({ user }) {
                   const enEdicion = editando.id === t.id;
                   const valores = enEdicion ? editando.valores : null;
                   const inputStyle = { width: "100%", minWidth: 110, padding: "6px 8px", fontSize: 14 };
+                  const pagoInfo = pagosPorTurno[t.id];
+                  const pagoAbierto = turnoPagosAbierto === t.id;
 
                   return (
-                    <tr key={t.id} className="group">
+                    <Fragment key={t.id}>
+                    <tr className="group">
                       <td>
                         {enEdicion ? (
                           <input
@@ -514,6 +761,23 @@ export default function Turnos({ user }) {
                         )}
                       </td>
                       {puedeAdministrarTurnos && (
+                        <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+                          {money(enEdicion ? (servicios.find((s) => s.nombre === valores.servicio)?.precio ?? t.precio) : t.precio)}
+                        </td>
+                      )}
+                      {puedeAdministrarTurnos && (
+                        <td>
+                          <div style={{ display: "grid", gap: 4 }}>
+                            <PagoBadge estado={pagoInfo?.estado_pago} />
+                            {pagoInfo && (
+                              <span style={{ fontSize: 11, color: "#64748B", whiteSpace: "nowrap" }}>
+                                {money(pagoInfo.total_pagado)} / saldo {money(pagoInfo.saldo)}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                      {puedeAdministrarTurnos && (
                         <td>
                           <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                             {enEdicion ? (
@@ -536,6 +800,14 @@ export default function Turnos({ user }) {
                               </>
                             ) : (
                               <>
+                                <button
+                                  onClick={() => setTurnoPagosAbierto(pagoAbierto ? null : t.id)}
+                                  style={{ padding: "5px 8px", display: "flex", alignItems: "center", background: pagoAbierto ? "#1D4ED8" : "#2563EB" }}
+                                  aria-label="Ver pagos del turno"
+                                  title="Ver pagos"
+                                >
+                                  <WalletCards size={13} />
+                                </button>
                                 <button
                                   onClick={() => iniciarEdicionFila(t)}
                                   style={{ padding: "5px 8px", display: "flex", alignItems: "center" }}
@@ -561,6 +833,21 @@ export default function Turnos({ user }) {
                         </td>
                       )}
                     </tr>
+                    {puedeAdministrarTurnos && pagoAbierto && (
+                      <tr>
+                        <td colSpan={10} style={{ padding: 0, background: "#F8FAFC" }}>
+                          <PagosPanel
+                            turno={t}
+                            onChanged={() => {
+                              cargarEstadosPago(turnos);
+                              traerTurnos();
+                            }}
+                            onToast={mostrarToast}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   );
                 })}
               </tbody>

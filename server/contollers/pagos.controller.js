@@ -131,15 +131,18 @@ async function listTurnosParaCobrar(req, res) {
   const { desde, hasta } = dateRangeFromQuery(req.query);
   if (desde > hasta) return res.status(400).json({ error: "La fecha desde no puede ser mayor a la fecha hasta" });
 
-  const { data, error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from("turnos")
     .select("id, fecha, hora, nombre, servicio, barbero, precio, estado")
     .eq("barberia_id", getBarberiaId(req))
-    .eq("estado", "completado")
     .gte("fecha", desde)
     .lte("fecha", hasta)
     .order("fecha", { ascending: false })
     .order("hora", { ascending: false });
+
+  if (req.query.todos !== "1") query = query.eq("estado", "completado");
+
+  const { data, error } = await query;
 
   if (error) return res.status(500).json({ error: error.message });
 

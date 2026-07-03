@@ -942,3 +942,154 @@ tr:hover td {
 .pwa-later:hover {
   background: #334155;
 }
+
+/* ========================= */
+/* TURNOS / PAGOS INLINE     */
+/* ========================= */
+
+.turno-pagos-panel {
+  padding: 16px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: #F8FAFC;
+}
+
+.turno-pagos-head,
+.turno-pagos-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.turno-pagos-head {
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.turno-pagos-title {
+  align-items: center;
+  gap: 7px;
+}
+
+.turno-pagos-title h3 {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.turno-pagos-head p {
+  margin: 3px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.turno-pagos-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.turno-pagos-summary > div,
+.turno-pago-row {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.turno-pagos-summary span {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 3px;
+}
+
+.turno-pagos-summary strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.turno-pagos-form {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+
+.turno-pagos-form label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.turno-pagos-form input,
+.turno-pagos-form select {
+  width: 100%;
+  margin: 4px 0 0;
+}
+
+.turno-pagos-form button {
+  min-height: 38px;
+}
+
+.turno-pagos-error {
+  background: #FEE2E2;
+  color: #991B1B;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.turno-pagos-list {
+  display: grid;
+  gap: 6px;
+}
+
+.turno-pagos-list > p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.turno-pago-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.turno-pago-row small {
+  display: block;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.turno-pago-delete {
+  background: transparent;
+  border: 0;
+  color: #B91C1C;
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.turno-pago-delete:hover {
+  background: #FEF2F2;
+  box-shadow: none;
+}
+
+@media (max-width: 760px) {
+  .turno-pagos-summary,
+  .turno-pagos-form {
+    grid-template-columns: 1fr;
+  }
+  .turno-pagos-head {
+    align-items: flex-start;
+  }
+}
