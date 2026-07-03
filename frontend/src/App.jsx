@@ -8,6 +8,7 @@ import Turnos from './pages/Turnos'
 import Barberos from './pages/Barberos'
 import Facturacion from './pages/Facturacion'
 import Configuracion from './pages/Configuracion'
+import Servicios from './pages/Servicios'
 import WhatsApp from './pages/WhatsApp'
 import SolicitudesWhatsApp from './pages/SolicitudesWhatsApp'
 import Cola from './pages/Cola'
@@ -125,6 +126,7 @@ function App() {
             <Route index element={<Navigate to={defaultRoute} replace />} />
             <Route path="turnos" element={<Turnos user={user} onLogout={handleLogout} />} />
             <Route path="barberos" element={<Barberos user={user} />} />
+            <Route path="servicios" element={<Servicios user={user} />} />
             <Route path="facturacion" element={<Facturacion user={user} />} />
             <Route path="whatsapp" element={<WhatsApp user={user} />} />
             <Route path="solicitudes-whatsapp" element={<SolicitudesWhatsApp user={user} />} />

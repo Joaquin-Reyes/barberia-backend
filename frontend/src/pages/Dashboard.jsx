@@ -1,10 +1,11 @@
 import { createElement, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { LayoutDashboard, Users, DollarSign, Settings, LogOut, Clock, Scissors, Menu, X, MessageCircle, ClipboardList } from 'lucide-react'
+import { LayoutDashboard, Users, DollarSign, Settings, LogOut, Clock, Scissors, Menu, X, MessageCircle, ClipboardList, Package } from 'lucide-react'
 
 const adminNavItems = [
   { to: 'turnos',        label: 'Turnos',        icon: LayoutDashboard },
   { to: 'barberos',      label: 'Barberos',       icon: Users           },
+  { to: 'servicios',     label: 'Servicios',      icon: Package         },
   { to: 'cola',          label: 'Cola',           icon: Clock           },
   { to: 'facturacion',   label: 'Facturación',    icon: DollarSign      },
   { to: 'whatsapp',      label: 'WhatsApp',       icon: MessageCircle   },
