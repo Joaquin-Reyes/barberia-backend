@@ -331,6 +331,45 @@ tr:hover td {
     width: 100%;
     margin-right: 0;
   }
+
+  .card div[style*="display: flex"] {
+    flex-wrap: wrap;
+  }
+
+  .topbar button,
+  .table-container td button,
+  .table-container th button,
+  .card div[style*="display: flex"] > button,
+  .fact-tabs button,
+  .fact-actions button,
+  .pwa-updater-actions button,
+  .turno-pagos-form button,
+  .turno-productos-form button {
+    width: auto;
+  }
+
+  .topbar button,
+  .card div[style*="display: flex"] > button {
+    min-height: 40px;
+    flex: 0 0 auto;
+  }
+
+  .table-container td button {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 7px 10px;
+    flex: 0 0 auto;
+  }
+
+  .table-container td > div[style*="display: flex"] {
+    flex-wrap: wrap;
+    justify-content: flex-start !important;
+  }
+
+  .form-grid button,
+  .card > button {
+    width: 100%;
+  }
 }
 
 /* ========================= */
@@ -345,9 +384,38 @@ tr:hover td {
   display: flex;
 }
 
+.mobile-bottom-menu {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  justify-content: center;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.mobile-bottom-menu-button {
+  width: 56px;
+  height: 48px;
+  min-height: 48px;
+  border-radius: 14px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary);
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.22);
+}
+
 @media (min-width: 640px) {
   .sidebar-desktop { display: flex; }
   .mobile-topbar   { display: none;  }
+  .mobile-bottom-menu { display: none; }
 }
 
 /* ========================= */
@@ -423,6 +491,9 @@ tr:hover td {
   }
   .page-content {
     padding: 16px;
+  }
+  .dashboard-content {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
   }
   .topbar {
     padding: 12px 16px;

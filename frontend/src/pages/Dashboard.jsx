@@ -105,9 +105,9 @@ function Dashboard({ user, onLogout }) {
       {/* ─── Main content ─── */}
       <main className="flex-1 overflow-y-auto flex flex-col">
 
-        {/* Topbar mobile con hamburger */}
+        {/* Topbar mobile */}
         <div
-          className="mobile-topbar flex items-center justify-between px-4 bg-white shrink-0"
+          className="mobile-topbar flex items-center px-4 bg-white shrink-0"
           style={{ height: 54, borderBottom: '1px solid #E2E8F0' }}
         >
           <div className="flex items-center gap-2.5">
@@ -121,19 +121,22 @@ function Dashboard({ user, onLogout }) {
               BarberApp
             </span>
           </div>
-          <button
-            onClick={() => setDrawerOpen(true)}
-            className="flex items-center justify-center rounded-lg bg-transparent"
-            style={{ width: 44, height: 44, border: 'none', color: '#0F172A' }}
-          >
-            <Menu size={30} />
-          </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="dashboard-content flex-1 overflow-y-auto">
           <Outlet />
         </div>
       </main>
+
+      <div className="mobile-bottom-menu sm:hidden">
+        <button
+          onClick={() => setDrawerOpen(true)}
+          className="mobile-bottom-menu-button"
+          aria-label="Abrir menu"
+        >
+          <Menu size={30} />
+        </button>
+      </div>
 
       {/* ─── Overlay ─── */}
       {drawerOpen && (
