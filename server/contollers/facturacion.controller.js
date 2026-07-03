@@ -31,6 +31,20 @@ function sortedGroups(map) {
   return Array.from(map.values()).sort((a, b) => b.total - a.total);
 }
 
+async function getProductosPorTurnos(barberiaId, turnoIds = []) {
+  const ids = [...new Set(turnoIds.filter(Boolean))];
+  if (!ids.length) return [];
+
+  const { data, error } = await supabaseAdmin
+    .from("turno_productos")
+    .select("turno_id, producto_id, nombre, cantidad, subtotal")
+    .eq("barberia_id", barberiaId)
+    .in("turno_id", ids);
+
+  if (error) throw error;
+  return data || [];
+}
+
 async function resumenDesdePagos(barberiaId, desde, hasta) {
   const range = businessDateRangeUtc(desde, hasta);
   const { data, error } = await supabaseAdmin
@@ -49,6 +63,7 @@ async function resumenDesdePagos(barberiaId, desde, hasta) {
   const porServicio = new Map();
   const porMetodo = new Map();
   const porTipo = new Map();
+  const porProducto = new Map();
   const porDia = new Map();
   let total = 0;
 
@@ -65,6 +80,17 @@ async function resumenDesdePagos(barberiaId, desde, hasta) {
 
   const barberos = sortedGroups(porBarbero);
   const servicios = sortedGroups(porServicio);
+  let totalProductos = 0;
+  try {
+    const productos = await getProductosPorTurnos(barberiaId, data.map((pago) => pago.turno_id));
+    for (const item of productos) {
+      const amount = asMoney(item.subtotal);
+      totalProductos += amount;
+      addToGroup(porProducto, item.producto_id || item.nombre || "sin_producto", item.nombre || "Sin producto", amount);
+    }
+  } catch {
+    totalProductos = 0;
+  }
 
   return {
     ok: true,
@@ -75,10 +101,12 @@ async function resumenDesdePagos(barberiaId, desde, hasta) {
       turnos_completados: data.length,
       pagos_count: data.length,
       ticket_promedio: data.length ? total / data.length : 0,
+      total_productos: totalProductos,
       mejor_barbero: barberos[0] || null,
       mejor_servicio: servicios[0] || null,
       por_barbero: barberos,
       por_servicio: servicios,
+      por_producto: sortedGroups(porProducto),
       por_metodo: sortedGroups(porMetodo),
       por_tipo: sortedGroups(porTipo),
       por_dia: Array.from(porDia.values()).sort((a, b) => a.id.localeCompare(b.id)),

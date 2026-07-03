@@ -22,6 +22,7 @@ const colaRoutes = require("./routes/cola.routes");
 const barberoRoutes = require("./routes/barbero.routes");
 const facturacionRoutes = require("./routes/facturacion.routes");
 const pagosRoutes = require("./routes/pagos.routes");
+const productosRoutes = require("./routes/productos.routes");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -75,6 +76,7 @@ app.use("/cola", colaRoutes);
 app.use("/barbero", barberoRoutes);
 app.use("/api/facturacion", facturacionRoutes);
 app.use("/api/pagos", pagosRoutes);
+app.use("/api/productos", productosRoutes);
 
 app.use((err, req, res, next) => {
   console.error("API ERROR:", err);

@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { Check, Plus, Search, Pencil, X, WalletCards, Trash2 } from "lucide-react";
 import { supabase, turnoDisponible, getAuthToken } from "../lib/supabase";
-import { pagos as pagosApi } from "../lib/api";
+import { pagos as pagosApi, productos as productosApi } from "../lib/api";
 
 const API = "https://barberia-backend-production-7dae.up.railway.app";
 
@@ -58,6 +58,8 @@ function PagoBadge({ estado }) {
 
 function PagosPanel({ turno, onChanged, onToast }) {
   const [data, setData] = useState(null);
+  const [productos, setProductos] = useState([]);
+  const [productoForm, setProductoForm] = useState({ producto_id: "", cantidad: 1 });
   const [form, setForm] = useState({
     monto: turno?.precio || "",
     metodo: "efectivo",
@@ -66,6 +68,7 @@ function PagosPanel({ turno, onChanged, onToast }) {
   });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingProducto, setSavingProducto] = useState(false);
   const [error, setError] = useState("");
 
   const cargar = useCallback(async () => {
@@ -91,6 +94,12 @@ function PagosPanel({ turno, onChanged, onToast }) {
     setForm({ monto: turno?.precio || "", metodo: "efectivo", tipo: "pago_total", nota: "" });
     cargar();
   }, [cargar, turno?.precio]);
+
+  useEffect(() => {
+    productosApi.list()
+      .then((items) => setProductos((items || []).filter((item) => item.activo)))
+      .catch(() => setProductos([]));
+  }, []);
 
   function set(campo, valor) {
     setForm((prev) => ({ ...prev, [campo]: valor }));
@@ -136,7 +145,50 @@ function PagosPanel({ turno, onChanged, onToast }) {
     }
   }
 
+  async function agregarProducto(e) {
+    e.preventDefault();
+    setError("");
+    if (!productoForm.producto_id) {
+      setError("Seleccioná un producto");
+      return;
+    }
+    if (!Number(productoForm.cantidad) || Number(productoForm.cantidad) <= 0) {
+      setError("Ingresá una cantidad válida");
+      return;
+    }
+
+    setSavingProducto(true);
+    try {
+      await pagosApi.addProductoTurno({
+        turno_id: turno.id,
+        producto_id: productoForm.producto_id,
+        cantidad: Number(productoForm.cantidad),
+      });
+      setProductoForm({ producto_id: "", cantidad: 1 });
+      await cargar();
+      onChanged?.();
+      onToast?.("Producto agregado al turno");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingProducto(false);
+    }
+  }
+
+  async function quitarProducto(itemId) {
+    setError("");
+    try {
+      await pagosApi.removeProductoTurno(itemId);
+      await cargar();
+      onChanged?.();
+      onToast?.("Producto quitado del turno");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   const pagos = data?.pagos || [];
+  const productosTurno = data?.productos || [];
   const activos = pagos.filter((p) => !p.anulado_at);
   const estadoLabel = {
     sin_pagar: "Sin pagar",
@@ -160,6 +212,18 @@ function PagosPanel({ turno, onChanged, onToast }) {
 
       <div className="turno-pagos-summary">
         <div>
+          <span>Servicio</span>
+          <strong>{loading ? "..." : money(data?.total_servicio ?? turno.precio)}</strong>
+        </div>
+        <div>
+          <span>Productos</span>
+          <strong>{loading ? "..." : money(data?.total_productos)}</strong>
+        </div>
+        <div>
+          <span>Total</span>
+          <strong>{loading ? "..." : money(data?.total_cobrable ?? turno.precio)}</strong>
+        </div>
+        <div>
           <span>Pagado</span>
           <strong>{loading ? "..." : money(data?.total_pagado)}</strong>
         </div>
@@ -171,6 +235,61 @@ function PagosPanel({ turno, onChanged, onToast }) {
           <span>Estado</span>
           <strong>{estadoLabel}</strong>
         </div>
+      </div>
+
+      <div className="turno-productos-box">
+        <div className="turno-productos-head">
+          <h4>Productos del turno</h4>
+          <span>{money(data?.total_productos)}</span>
+        </div>
+        <form className="turno-productos-form" onSubmit={agregarProducto}>
+          <label>
+            Producto
+            <select
+              value={productoForm.producto_id}
+              onChange={(e) => setProductoForm((current) => ({ ...current, producto_id: e.target.value }))}
+            >
+              <option value="">Seleccionar producto</option>
+              {productos.map((producto) => (
+                <option key={producto.id} value={producto.id}>
+                  {producto.nombre} - {money(producto.precio)} · stock {Number(producto.stock || 0).toLocaleString("es-AR")}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Cantidad
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={productoForm.cantidad}
+              onChange={(e) => setProductoForm((current) => ({ ...current, cantidad: e.target.value }))}
+            />
+          </label>
+          <button type="submit" disabled={savingProducto || !productoForm.producto_id}>
+            {savingProducto ? "Agregando..." : "Agregar"}
+          </button>
+        </form>
+
+        {productosTurno.length === 0 ? (
+          <p className="turno-productos-empty">Sin productos agregados.</p>
+        ) : (
+          <div className="turno-productos-list">
+            {productosTurno.map((item) => (
+              <div className="turno-producto-row" key={item.id}>
+                <span>
+                  <strong>{item.nombre}</strong>
+                  <small>{Number(item.cantidad || 0).toLocaleString("es-AR")} x {money(item.precio_unitario)}</small>
+                </span>
+                <strong>{money(item.subtotal)}</strong>
+                <button type="button" className="turno-pago-delete" onClick={() => quitarProducto(item.id)} aria-label="Quitar producto">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <form className="turno-pagos-form" onSubmit={registrar}>
@@ -762,7 +881,12 @@ export default function Turnos({ user }) {
                       </td>
                       {puedeAdministrarTurnos && (
                         <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
-                          {money(enEdicion ? (servicios.find((s) => s.nombre === valores.servicio)?.precio ?? t.precio) : t.precio)}
+                          {money(enEdicion ? (servicios.find((s) => s.nombre === valores.servicio)?.precio ?? t.precio) : (pagoInfo?.total_cobrable ?? t.precio))}
+                          {pagoInfo?.total_productos > 0 && (
+                            <div style={{ fontSize: 11, color: "#64748B", fontWeight: 400 }}>
+                              Incluye productos
+                            </div>
+                          )}
                         </td>
                       )}
                       {puedeAdministrarTurnos && (

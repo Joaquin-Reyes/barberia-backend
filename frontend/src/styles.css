@@ -1019,6 +1019,84 @@ tr:hover td {
   margin-bottom: 12px;
 }
 
+.turno-productos-box {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.turno-productos-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.turno-productos-head h4 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.turno-productos-head span {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.turno-productos-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(90px, 120px) auto;
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 10px;
+}
+
+.turno-productos-form label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.turno-productos-form input,
+.turno-productos-form select {
+  width: 100%;
+  margin: 4px 0 0;
+}
+
+.turno-productos-form button {
+  min-height: 38px;
+}
+
+.turno-productos-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.turno-productos-list {
+  display: grid;
+  gap: 6px;
+}
+
+.turno-producto-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(78px, auto) auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.turno-producto-row small {
+  display: block;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
 .turno-pagos-form label {
   font-size: 11px;
   color: var(--text-secondary);
@@ -1086,7 +1164,8 @@ tr:hover td {
 
 @media (max-width: 760px) {
   .turno-pagos-summary,
-  .turno-pagos-form {
+  .turno-pagos-form,
+  .turno-productos-form {
     grid-template-columns: 1fr;
   }
   .turno-pagos-head {

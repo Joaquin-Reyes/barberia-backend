@@ -36,6 +36,13 @@ export const pagos = {
     return request(`/api/pagos/turnos${qs ? `?${qs}` : ''}`)
   },
   byTurno: (turnoId) => request(`/api/pagos/turno/${turnoId}`),
+  addProductoTurno: (body) => request('/api/pagos/turno-productos', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  }),
+  removeProductoTurno: (itemId) => request(`/api/pagos/turno-productos/${itemId}`, {
+    method: 'DELETE',
+  }),
   create: (body) => request('/api/pagos', { method: 'POST', body: JSON.stringify(body) }),
   anular: (id, motivo) => request(`/api/pagos/${id}/anular`, {
     method: 'POST',
@@ -57,4 +64,14 @@ export const pagos = {
     method: 'POST',
     body: JSON.stringify({ motivo }),
   }),
+}
+
+export const productos = {
+  list: () => request('/api/productos'),
+  create: (body) => request('/api/productos', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id, body) => request(`/api/productos/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  }),
+  delete: (id) => request(`/api/productos/${id}`, { method: 'DELETE' }),
 }

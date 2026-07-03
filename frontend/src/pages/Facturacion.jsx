@@ -602,6 +602,7 @@ export default function Facturacion() {
   const operaciones = usaPagos ? data?.pagos_count || 0 : data?.turnos_completados || 0
   const ticketPromedio = data?.ticket_promedio || 0
   const mejorBarbero = data?.mejor_barbero || data?.por_barbero?.[0]
+  const totalProductos = data?.total_productos || cajaData?.total_productos || 0
   const movimientos = cajaData?.pagos || []
   const tabs = [
     { id: 'caja', label: 'Caja', sub: `${cajaData?.pagos_count || 0} pagos`, Icon: ClipboardCheck },
@@ -628,6 +629,7 @@ export default function Facturacion() {
 
       <div className="fact-stats">
         <StatCard label="Caja barbería" value={loading ? '...' : money(total)} sub={usaPagos ? 'Pagos reales' : 'Total por turnos'} Icon={DollarSign} />
+        <StatCard label="Productos" value={loading ? '...' : money(totalProductos)} sub="Sumados a turnos" Icon={WalletCards} />
         <StatCard label={usaPagos ? 'Pagos' : 'Turnos completados'} value={loading ? '...' : operaciones} sub="Base de cálculo" Icon={CalendarCheck} />
         <StatCard label="Ticket promedio" value={loading ? '...' : money(ticketPromedio)} sub={usaPagos ? 'Por pago' : 'Por turno completado'} Icon={ReceiptText} />
         <StatCard label="Mayor aporte" value={loading ? '...' : (mejorBarbero?.nombre || '-')} sub={mejorBarbero ? money(mejorBarbero.total) : 'Sin datos'} Icon={TrendingUp} />
@@ -664,6 +666,7 @@ export default function Facturacion() {
           <Ranking title="Por servicio" Icon={ReceiptText} rows={data?.por_servicio || []} nameLabel="Servicio" countLabel={usaPagos ? 'Pagos' : 'Turnos'} countKey={usaPagos ? 'pagos' : 'turnos'} />
           {usaPagos && <Ranking title="Por método" Icon={WalletCards} rows={data?.por_metodo || []} nameLabel="Método" />}
           {usaPagos && <Ranking title="Por tipo" Icon={ReceiptText} rows={data?.por_tipo || []} nameLabel="Tipo" />}
+          {usaPagos && <Ranking title="Por producto" Icon={WalletCards} rows={data?.por_producto || cajaData?.por_producto || []} nameLabel="Producto" />}
           <Ranking title="Por día" Icon={CalendarCheck} rows={data?.por_dia || []} nameLabel="Día" countLabel={usaPagos ? 'Pagos' : 'Turnos'} countKey={usaPagos ? 'pagos' : 'turnos'} />
         </div>
       )}
