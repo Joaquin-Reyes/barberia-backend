@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Check, ClipboardList, RefreshCw, Search, X } from "lucide-react";
+import { CalendarCheck, Check, ClipboardList, RefreshCw, Search, X } from "lucide-react";
 import { getAuthToken } from "../lib/supabase";
 
 const API = "https://barberia-backend-production-7dae.up.railway.app";
@@ -19,6 +19,25 @@ function formatoFecha(valor) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function camposFaltantes(solicitud) {
+  const campos = [
+    ["nombre", "cliente"],
+    ["telefono", "telefono"],
+    ["servicio", "servicio"],
+    ["profesional", "profesional"],
+    ["fecha_preferida", "fecha"],
+    ["hora_preferida", "hora"],
+  ];
+
+  return campos
+    .filter(([campo]) => !String(solicitud[campo] || "").trim())
+    .map(([, etiqueta]) => etiqueta);
+}
+
+function puedeAgendar(solicitud) {
+  return camposFaltantes(solicitud).length === 0 && !solicitud.turno_id;
 }
 
 export default function SolicitudesWhatsApp({ user }) {
@@ -86,7 +105,7 @@ export default function SolicitudesWhatsApp({ user }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se pudo guardar el turno");
-      mostrarToast(data.warning || "Turno guardado correctamente");
+      mostrarToast(data.warning || "Turno agendado y guardado correctamente");
       cargarSolicitudes();
     } catch (error) {
       mostrarToast(error.message || "No se pudo guardar el turno", "error");
@@ -180,7 +199,12 @@ export default function SolicitudesWhatsApp({ user }) {
                   </tr>
                 )}
 
-                {filtradas.map((solicitud) => (
+                {filtradas.map((solicitud) => {
+                  const faltantes = camposFaltantes(solicitud);
+                  const listaParaAgendar = puedeAgendar(solicitud);
+                  const guardando = guardandoTurnoId === solicitud.id;
+
+                  return (
                   <tr key={solicitud.id}>
                     <td>
                       <div style={{ fontWeight: 600 }}>{solicitud.nombre || "Sin nombre"}</div>
@@ -198,6 +222,11 @@ export default function SolicitudesWhatsApp({ user }) {
                     <td>
                       <div>{solicitud.fecha_preferida || "Sin fecha"}</div>
                       <div style={{ fontSize: 12, color: "#64748B" }}>{solicitud.hora_preferida || "Sin hora"}</div>
+                      {!solicitud.turno_id && faltantes.length > 0 && (
+                        <div style={{ fontSize: 11, color: "#DC2626", marginTop: 3 }}>
+                          Faltan: {faltantes.join(", ")}
+                        </div>
+                      )}
                     </td>
                     <td>
                       <span className={`estado ${solicitud.estado === "descartada" ? "cancelado" : solicitud.estado === "resuelta" ? "completado" : "pendiente"}`}>
@@ -209,25 +238,32 @@ export default function SolicitudesWhatsApp({ user }) {
                       <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
                         <button
                           onClick={() => guardarTurno(solicitud)}
-                          disabled={
-                            guardandoTurnoId === solicitud.id ||
-                            Boolean(solicitud.turno_id) ||
-                            !solicitud.nombre ||
-                            !solicitud.telefono ||
-                            !solicitud.servicio ||
-                            !solicitud.profesional ||
-                            !solicitud.fecha_preferida ||
-                            !solicitud.hora_preferida
-                          }
+                          disabled={guardando || !listaParaAgendar}
                           style={{
-                            padding: "6px 9px",
-                            background: solicitud.turno_id ? "#DCFCE7" : "#2563EB",
-                            opacity: guardandoTurnoId === solicitud.id || solicitud.turno_id ? 0.7 : 1,
+                            padding: "7px 10px",
+                            minWidth: 132,
+                            minHeight: 36,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 6,
+                            background: solicitud.turno_id ? "#DCFCE7" : listaParaAgendar ? "#16A34A" : "#E2E8F0",
+                            color: solicitud.turno_id ? "#166534" : listaParaAgendar ? "#FFFFFF" : "#64748B",
+                            border: solicitud.turno_id ? "1px solid #BBF7D0" : listaParaAgendar ? "1px solid #15803D" : "1px solid #CBD5E1",
+                            opacity: guardando ? 0.75 : 1,
+                            cursor: guardando || !listaParaAgendar ? "not-allowed" : "pointer",
                           }}
-                          aria-label="Guardar turno"
-                          title="Guardar turno"
+                          aria-label="Agendar turno"
+                          title={
+                            solicitud.turno_id
+                              ? "Turno ya agendado"
+                              : faltantes.length
+                                ? `Faltan datos: ${faltantes.join(", ")}`
+                                : "Agendar y guardar turno"
+                          }
                         >
-                          <Check size={13} />
+                          {solicitud.turno_id ? <Check size={14} /> : <CalendarCheck size={14} />}
+                          {solicitud.turno_id ? "Agendado" : guardando ? "Agendando" : "Agendar turno"}
                         </button>
                         <button
                           onClick={() => actualizarEstado(solicitud.id, "en_revision")}
@@ -247,7 +283,8 @@ export default function SolicitudesWhatsApp({ user }) {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

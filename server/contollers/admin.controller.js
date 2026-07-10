@@ -591,6 +591,10 @@ async function crearTurnoDesdeSolicitudWhatsapp(req, res) {
       return res.status(404).json({ error: "Solicitud no encontrada" });
     }
 
+    if (solicitud.turno_id) {
+      return res.status(409).json({ error: "Esta solicitud ya tiene un turno agendado" });
+    }
+
     const nombre = String(solicitud.nombre || "").trim();
     const telefono = String(solicitud.telefono || "").trim();
     const servicio = String(solicitud.servicio || "").trim();
