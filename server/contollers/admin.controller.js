@@ -633,7 +633,7 @@ async function crearTurnoDesdeSolicitudWhatsapp(req, res) {
         fecha,
         hora,
         barberia_id,
-        estado: "confirmado",
+        estado: "pendiente",
         recordatorio_24h: false,
         recordatorio_3h: false
       }])
@@ -660,21 +660,6 @@ async function crearTurnoDesdeSolicitudWhatsapp(req, res) {
     if (updateError) {
       console.log("⚠️ Turno creado pero no se pudo vincular la solicitud:", updateError);
       return res.json({ ok: true, turno, warning: "Turno creado, pero no se pudo vincular la solicitud" });
-    }
-
-    try {
-      const [y, m, d] = fecha.split("-");
-      await enviarTemplateConfirmacion({
-        telefono,
-        servicio,
-        barbero,
-        fecha: `${d}/${m}/${y}`,
-        horario: hora,
-        precio: servicioData?.precio || 0,
-        barberia_id
-      });
-    } catch (errTemplate) {
-      console.error("❌ Error enviando confirmacion desde solicitud:", errTemplate.response?.data || errTemplate.message);
     }
 
     res.json({ ok: true, turno });
