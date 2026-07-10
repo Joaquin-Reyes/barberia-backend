@@ -29,7 +29,17 @@ async function initializeAllClients() {
       .select('id')
       .eq('whatsapp_mode', 'wwebjs');
 
-    if (error || !barberias?.length) return;
+    if (error) {
+      console.error('[wwebjs] No se pudieron listar barberias wwebjs:', error.message);
+      return;
+    }
+
+    if (!barberias?.length) {
+      console.log('[wwebjs] No hay barberias con whatsapp_mode=wwebjs.');
+      return;
+    }
+
+    console.log(`[wwebjs] Inicializando ${barberias.length} cliente(s) WhatsApp Web.`);
 
     for (const b of barberias) {
       initClient(b.id);

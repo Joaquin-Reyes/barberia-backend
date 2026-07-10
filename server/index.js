@@ -23,6 +23,7 @@ const barberoRoutes = require("./routes/barbero.routes");
 const facturacionRoutes = require("./routes/facturacion.routes");
 const pagosRoutes = require("./routes/pagos.routes");
 const productosRoutes = require("./routes/productos.routes");
+const { initializeAllClients } = require("./services/wwebjs.manager");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -93,6 +94,7 @@ app.use((req, res) => {
 // ==============================
 
 app.listen(PORT, "0.0.0.0", () => {
+  initializeAllClients();
   console.log(`🔥 Servidor corriendo en puerto ${PORT}`);
 
 });
