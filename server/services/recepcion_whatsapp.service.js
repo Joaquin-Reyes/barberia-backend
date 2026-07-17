@@ -5,6 +5,8 @@ const { obtenerHorariosDisponibles, formatearHora } = require("./agenda.service"
 const sesiones = new Map();
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const IA_RECEPCION_ENABLED = process.env.WHATSAPP_RECEPCION_AI_ENABLED === "true";
+let iaSuspendidaHasta = 0;
+let iaUltimoError = null;
 
 function limpiarTelefono(valor) {
   return String(valor || "").replace("@c.us", "").replace(/\D/g, "");
@@ -16,7 +18,13 @@ function resolverDestinoWhatsapp(valor) {
 }
 
 function iaRecepcionDisponible() {
-  return IA_RECEPCION_ENABLED && Boolean(process.env.OPENAI_API_KEY);
+  return IA_RECEPCION_ENABLED && Boolean(process.env.OPENAI_API_KEY) && Date.now() >= iaSuspendidaHasta;
+}
+
+function suspenderIARecepcion(ms, motivo) {
+  iaSuspendidaHasta = Date.now() + ms;
+  iaUltimoError = motivo;
+  console.warn(`[recepcion-ai] IA suspendida temporalmente: ${motivo}`);
 }
 
 function normalizarTexto(texto) {
@@ -259,6 +267,12 @@ async function inferirCamposConIA({ mensaje, sesion, barberia }) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("[recepcion-ai] Error OpenAI:", response.status, errorText);
+      if (response.status === 429) {
+        const motivo = errorText.includes("insufficient_quota")
+          ? "insufficient_quota"
+          : "rate_limit";
+        suspenderIARecepcion(30 * 60 * 1000, motivo);
+      }
       return null;
     }
 
@@ -536,9 +550,14 @@ async function procesarRecepcionWhatsapp({ barberia_id, from, text }) {
   const barberia = await obtenerDatosBarberia(barberia_id);
   const sesion = sesiones.get(userKey) || crearSesion();
   const mensaje = String(text || "").trim();
+
+  if (sesion.estado === "inicio" && !tieneIntencionTurno(mensaje)) {
+    return { ignored: true, reason: "sin_intencion_turno" };
+  }
+
   const fechaAnterior = sesion.fecha_preferida;
   const extraccionIA = await inferirCamposConIA({ mensaje, sesion, barberia });
-  console.log(`[recepcion] barberia=${barberia_id} ai=${extraccionIA ? "on" : iaRecepcionDisponible() ? "fallback" : "off"} from=${telefono} msg="${mensaje.slice(0, 80)}"`);
+  console.log(`[recepcion] barberia=${barberia_id} ai=${extraccionIA ? "on" : iaRecepcionDisponible() ? "fallback" : iaUltimoError ? `off:${iaUltimoError}` : "off"} from=${telefono} msg="${mensaje.slice(0, 80)}"`);
   aplicarExtraccionIA(sesion, extraccionIA);
   const fechaDetectadaEnMensaje = resolverFechaPreferida(mensaje);
   const horaDetectadaEnMensaje = extraerHora(mensaje);
@@ -549,10 +568,6 @@ async function procesarRecepcionWhatsapp({ barberia_id, from, text }) {
   const profesionalInferido = extraccionIA?.profesional || profesionalDetectadoEnMensaje?.nombre || null;
   const fechaInferida = extraccionIA?.fecha_preferida || fechaDetectadaEnMensaje;
   const horaInferida = extraccionIA?.hora_preferida || horaDetectadaEnMensaje;
-
-  if (sesion.estado === "inicio" && !tieneIntencionTurno(mensaje)) {
-    return { ignored: true, reason: "sin_intencion_turno" };
-  }
 
   sesion.mensajes.push({
     from: "cliente",

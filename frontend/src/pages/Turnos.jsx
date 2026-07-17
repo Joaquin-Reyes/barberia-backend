@@ -76,7 +76,7 @@ function PagosPanel({ turno, onChanged, onToast }) {
     setLoading(true);
     setError("");
     try {
-      const resumen = await pagosApi.byTurno(turno.id);
+      const resumen = await pagosApi.byTurno(turno.id, { legacyCompletados: "1" });
       setData(resumen);
       setForm((prev) => ({
         ...prev,
@@ -108,6 +108,10 @@ function PagosPanel({ turno, onChanged, onToast }) {
   async function registrar(e) {
     e.preventDefault();
     setError("");
+    if (cobroBloqueado) {
+      setError("El turno ya figura saldado");
+      return;
+    }
     if (!Number(form.monto) || Number(form.monto) <= 0) {
       setError("Ingresá un monto válido");
       return;
@@ -190,6 +194,7 @@ function PagosPanel({ turno, onChanged, onToast }) {
   const pagos = data?.pagos || [];
   const productosTurno = data?.productos || [];
   const activos = pagos.filter((p) => !p.anulado_at);
+  const cobroBloqueado = data?.pago_historico || (data && Number(data.saldo || 0) <= 0 && form.tipo !== "ajuste");
   const estadoLabel = {
     sin_pagar: "Sin pagar",
     sena: "Con seña",
@@ -313,7 +318,7 @@ function PagosPanel({ turno, onChanged, onToast }) {
           Nota
           <input value={form.nota} onChange={(e) => set("nota", e.target.value)} placeholder="Opcional" />
         </label>
-        <button type="submit" disabled={saving}>{saving ? "Registrando..." : "Registrar pago"}</button>
+        <button type="submit" disabled={saving || cobroBloqueado}>{saving ? "Registrando..." : "Registrar pago"}</button>
       </form>
 
       {error && <div className="turno-pagos-error">{error}</div>}
@@ -368,7 +373,7 @@ export default function Turnos({ user }) {
     if (!(rolUsuario === "admin" || rolUsuario === "superadmin")) return;
 
     try {
-      const data = await pagosApi.turnos({ desde, hasta, todos: "1" });
+      const data = await pagosApi.turnos({ desde, hasta, todos: "1", legacyCompletados: "1" });
       const mapa = {};
       for (const item of data || []) mapa[item.id] = item;
       setPagosPorTurno(mapa);

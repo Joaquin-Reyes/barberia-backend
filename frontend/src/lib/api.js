@@ -35,7 +35,10 @@ export const pagos = {
     const qs = new URLSearchParams(params).toString()
     return request(`/api/pagos/turnos${qs ? `?${qs}` : ''}`)
   },
-  byTurno: (turnoId) => request(`/api/pagos/turno/${turnoId}`),
+  byTurno: (turnoId, params = {}) => {
+    const qs = new URLSearchParams(params).toString()
+    return request(`/api/pagos/turno/${turnoId}${qs ? `?${qs}` : ''}`)
+  },
   addProductoTurno: (body) => request('/api/pagos/turno-productos', {
     method: 'POST',
     body: JSON.stringify(body),

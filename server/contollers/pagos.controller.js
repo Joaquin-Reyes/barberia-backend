@@ -130,6 +130,27 @@ function getEstadoPago(precio, totalPagado, pagos) {
   return "parcial";
 }
 
+function buildResumenPagoTurno(turno, totalProductos, pagos = [], options = {}) {
+  const totalCobrable = asMoney(turno.precio) + asMoney(totalProductos);
+  const activos = pagos.filter((p) => !p.anulado_at);
+  const totalPagadoReal = activos.reduce((sum, pago) => sum + asMoney(pago.monto), 0);
+  const pagoHistorico = Boolean(options.legacyCompletados)
+    && activos.length === 0
+    && turno.estado === "completado"
+    && totalCobrable > 0;
+  const totalPagado = pagoHistorico ? totalCobrable : totalPagadoReal;
+
+  return {
+    total_servicio: asMoney(turno.precio),
+    total_productos: asMoney(totalProductos),
+    total_cobrable: totalCobrable,
+    total_pagado: totalPagado,
+    saldo: Math.max(totalCobrable - totalPagado, 0),
+    estado_pago: pagoHistorico ? "pagado" : getEstadoPago(totalCobrable, totalPagado, pagos),
+    pago_historico: pagoHistorico,
+  };
+}
+
 function pagoSuperaSaldo({ tipo, precio, totalPagado, monto }) {
   if (tipo === "ajuste") return false;
   const precioNumber = asMoney(precio);
@@ -152,19 +173,15 @@ async function getPagosTurno(req, res) {
 
   const pagos = data || [];
   const productos = await getProductosTurno(turno.id, getBarberiaId(req));
-  const totalPagado = pagos.filter((p) => !p.anulado_at).reduce((sum, pago) => sum + asMoney(pago.monto), 0);
   const totalProductos = productos.reduce((sum, item) => sum + asMoney(item.subtotal), 0);
-  const precio = asMoney(turno.precio) + totalProductos;
+  const resumenPago = buildResumenPagoTurno(turno, totalProductos, pagos, {
+    legacyCompletados: req.query.legacyCompletados === "1",
+  });
 
   res.json({
     pagos,
     productos,
-    total_servicio: asMoney(turno.precio),
-    total_productos: totalProductos,
-    total_cobrable: precio,
-    total_pagado: totalPagado,
-    saldo: Math.max(precio - totalPagado, 0),
-    estado_pago: getEstadoPago(precio, totalPagado, pagos),
+    ...resumenPago,
   });
 }
 
@@ -216,17 +233,16 @@ async function listTurnosParaCobrar(req, res) {
   }
 
   res.json((data || []).map((turno) => {
-    const totalPagado = pagosPorTurno.get(turno.id) || 0;
     const totalProductos = productosPorTurno.get(turno.id) || 0;
-    const precio = asMoney(turno.precio) + totalProductos;
+    const totalPagado = pagosPorTurno.get(turno.id) || 0;
+    const pagos = totalPagado > 0 ? [{ monto: totalPagado }] : [];
+    const resumenPago = buildResumenPagoTurno(turno, totalProductos, pagos, {
+      legacyCompletados: req.query.legacyCompletados === "1",
+    });
+
     return {
       ...turno,
-      total_servicio: asMoney(turno.precio),
-      total_productos: totalProductos,
-      total_cobrable: precio,
-      total_pagado: totalPagado,
-      saldo: Math.max(precio - totalPagado, 0),
-      estado_pago: totalPagado <= 0 ? "sin_pagar" : totalPagado >= precio ? "pagado" : "parcial",
+      ...resumenPago,
     };
   }));
 }
