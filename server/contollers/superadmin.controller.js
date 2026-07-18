@@ -30,7 +30,7 @@ async function crearBarberia(req, res) {
     const { data: barberia, error: errorBarberia } =
       await supabaseAdmin
         .from("barberias")
-        .insert([{ nombre, whatsapp_mode: "wwebjs", activo: true }])
+        .insert([{ nombre, whatsapp_mode: "cloud_api", activo: true }])
         .select()
         .single();
 

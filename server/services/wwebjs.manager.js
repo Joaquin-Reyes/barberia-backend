@@ -4,6 +4,7 @@ const fs = require('fs');
 // barberia_id → { client, qr, status }
 const clients = new Map();
 const isEnabled = () => process.env.WHATSAPP_ENABLED === 'true' && process.env.WWEBJS_ENABLED === 'true';
+const shouldAutoInit = () => process.env.WWEBJS_AUTO_INIT === 'true';
 const shouldAutoReconnect = () => process.env.WWEBJS_AUTO_RECONNECT === 'true';
 
 function isDirectChatId(chatId) {
@@ -18,6 +19,10 @@ function isDirectChatId(chatId) {
 async function initializeAllClients() {
   if (!isEnabled()) {
     console.log('[wwebjs] Deshabilitado. No se inicializan clientes WhatsApp Web.');
+    return;
+  }
+  if (!shouldAutoInit()) {
+    console.log('[wwebjs] Auto-init deshabilitado. No se generan QR ni se inicia Chromium al arrancar.');
     return;
   }
 

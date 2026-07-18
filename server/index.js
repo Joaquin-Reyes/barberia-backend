@@ -57,6 +57,19 @@ app.use(session({
 // STATIC FRONTEND
 // ==============================
 
+app.use((req, res, next) => {
+  if (
+    req.path === "/" ||
+    req.path === "/index.html" ||
+    req.path === "/sw.js" ||
+    req.path.startsWith("/workbox-") ||
+    req.path === "/manifest.webmanifest"
+  ) {
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, "../frontend/dist")));
 
 // ==============================

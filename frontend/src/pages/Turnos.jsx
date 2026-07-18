@@ -56,6 +56,11 @@ function PagoBadge({ estado }) {
   );
 }
 
+function estadoPagoTurno(turno, pagoInfo) {
+  if (pagoInfo?.estado_pago) return pagoInfo.estado_pago;
+  return turno?.estado === "completado" ? "pagado" : "sin_pagar";
+}
+
 function PagosPanel({ turno, onChanged, onToast }) {
   const [data, setData] = useState(null);
   const [productos, setProductos] = useState([]);
@@ -76,7 +81,7 @@ function PagosPanel({ turno, onChanged, onToast }) {
     setLoading(true);
     setError("");
     try {
-      const resumen = await pagosApi.byTurno(turno.id, { legacyCompletados: "1" });
+      const resumen = await pagosApi.byTurno(turno.id);
       setData(resumen);
       setForm((prev) => ({
         ...prev,
@@ -194,7 +199,7 @@ function PagosPanel({ turno, onChanged, onToast }) {
   const pagos = data?.pagos || [];
   const productosTurno = data?.productos || [];
   const activos = pagos.filter((p) => !p.anulado_at);
-  const cobroBloqueado = data?.pago_historico || (data && Number(data.saldo || 0) <= 0 && form.tipo !== "ajuste");
+  const cobroBloqueado = data && Number(data.saldo || 0) <= 0 && form.tipo !== "ajuste";
   const estadoLabel = {
     sin_pagar: "Sin pagar",
     sena: "Con seña",
@@ -845,7 +850,7 @@ export default function Turnos({ user }) {
                           </div>
                           <div>
                             <small>Pago</small>
-                            <PagoBadge estado={pagoInfo?.estado_pago} />
+                            <PagoBadge estado={estadoPagoTurno(t, pagoInfo)} />
                             {pagoInfo && <span>{money(pagoInfo.total_pagado)} / saldo {money(pagoInfo.saldo)}</span>}
                           </div>
                         </div>
@@ -1035,7 +1040,7 @@ export default function Turnos({ user }) {
                       {puedeAdministrarTurnos && (
                         <td className={enEdicion ? "turno-edit-hide" : ""}>
                           <div style={{ display: "grid", gap: 4 }}>
-                            <PagoBadge estado={pagoInfo?.estado_pago} />
+                            <PagoBadge estado={estadoPagoTurno(t, pagoInfo)} />
                             {pagoInfo && (
                               <span style={{ fontSize: 11, color: "#64748B", whiteSpace: "nowrap" }}>
                                 {money(pagoInfo.total_pagado)} / saldo {money(pagoInfo.saldo)}
