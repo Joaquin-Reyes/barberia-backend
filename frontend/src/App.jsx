@@ -8,6 +8,7 @@ import Turnos from './pages/Turnos'
 import Barberos from './pages/Barberos'
 import Facturacion from './pages/Facturacion'
 import Configuracion from './pages/Configuracion'
+import Cuenta from './pages/Cuenta'
 import Servicios from './pages/Servicios'
 import WhatsApp from './pages/WhatsApp'
 import SolicitudesWhatsApp from './pages/SolicitudesWhatsApp'
@@ -131,6 +132,7 @@ function App() {
             <Route path="whatsapp" element={<WhatsApp user={user} />} />
             <Route path="solicitudes-whatsapp" element={<SolicitudesWhatsApp user={user} />} />
             <Route path="configuracion" element={<Configuracion user={user} />} />
+            <Route path="cuenta" element={<Cuenta user={user} onLogout={handleLogout} />} />
             {user.rol !== 'barbero' && (
               <Route path="cola" element={<Cola user={user} />} />
             )}

@@ -384,6 +384,29 @@ tr:hover td {
   display: none;
 }
 
+.mobile-account-link {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.mobile-account-link.active {
+  color: var(--primary);
+  background: var(--primary-subtle);
+  border-color: #BFDBFE;
+}
+
 .bottom-nav {
   position: fixed;
   left: 0;
@@ -1599,5 +1622,236 @@ tr:hover td {
   .turno-mobile-actions,
   .turno-mobile-edit-row {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ========================= */
+/* MI CUENTA                 */
+/* ========================= */
+
+.account-page {
+  min-height: 100%;
+  background: var(--bg);
+}
+
+.account-topbar h1 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.account-topbar p {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.account-secondary-button,
+.account-danger-button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.account-secondary-button {
+  background: #fff;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.account-secondary-button:hover {
+  background: #F8FAFC;
+  box-shadow: none;
+}
+
+.account-content {
+  display: grid;
+  gap: 16px;
+}
+
+.account-profile,
+.account-panel {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.account-profile {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+}
+
+.account-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--primary-subtle);
+  color: #1D4ED8;
+  border: 1px solid #BFDBFE;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.account-profile-main {
+  min-width: 0;
+}
+
+.account-profile-main span {
+  display: block;
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.account-profile-main h2 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.account-profile-main p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.account-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.account-panel {
+  padding: 16px;
+  min-width: 0;
+}
+
+.account-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--text-secondary);
+}
+
+.account-panel-title h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+}
+
+.account-info-list {
+  display: grid;
+  gap: 0;
+}
+
+.account-info-list.compact {
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.account-info-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 160px) minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  align-items: start;
+}
+
+.account-info-list .account-info-row:first-child {
+  border-top: 0;
+}
+
+.account-info-row span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.account-info-row strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.account-muted {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.account-permissions {
+  display: grid;
+  gap: 8px;
+}
+
+.account-permissions > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.account-permissions svg {
+  color: #16A34A;
+  flex: 0 0 auto;
+}
+
+.account-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.account-actions button {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.account-danger-button {
+  background: transparent;
+  color: #B91C1C;
+  border: 1px solid #FECACA;
+}
+
+.account-danger-button:hover {
+  background: #FEF2F2;
+  box-shadow: none;
+}
+
+@media (max-width: 760px) {
+  .account-profile,
+  .account-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .account-profile {
+    align-items: start;
+  }
+
+  .account-info-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .account-actions button,
+  .account-secondary-button {
+    width: 100%;
   }
 }

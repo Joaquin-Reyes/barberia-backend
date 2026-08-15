@@ -1,6 +1,6 @@
 import { createElement, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { LayoutDashboard, Users, DollarSign, Settings, LogOut, Clock, Scissors, Menu, X, MessageCircle, ClipboardList, Package } from 'lucide-react'
+import { LayoutDashboard, Users, DollarSign, Settings, LogOut, Clock, Scissors, Menu, X, MessageCircle, ClipboardList, Package, UserCircle } from 'lucide-react'
 
 const adminNavItems = [
   { to: 'turnos',        label: 'Turnos',        icon: LayoutDashboard },
@@ -10,11 +10,13 @@ const adminNavItems = [
   { to: 'facturacion',   label: 'Facturación',    icon: DollarSign      },
   { to: 'whatsapp',      label: 'WhatsApp',       icon: MessageCircle   },
   { to: 'solicitudes-whatsapp', label: 'Solicitudes', icon: ClipboardList },
+  { to: 'cuenta',        label: 'Mi cuenta',      icon: UserCircle      },
   { to: 'configuracion', label: 'Configuración',  icon: Settings        },
 ]
 
 const barberoNavItems = [
   { to: 'panel-barbero', label: 'Mi Panel', icon: Scissors },
+  { to: 'cuenta',        label: 'Mi cuenta', icon: UserCircle },
 ]
 
 function BottomNav({ items, onMenuOpen }) {
@@ -103,17 +105,26 @@ function Dashboard({ user, onLogout }) {
           className="px-3 py-4"
           style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
         >
-          <div className="flex items-center gap-2.5 px-1 mb-3">
+          <NavLink
+            to="cuenta"
+            className="flex items-center gap-2.5 px-1 mb-3 rounded-lg transition-colors hover:bg-white/5"
+            style={{ textDecoration: 'none', paddingTop: 6, paddingBottom: 6 }}
+          >
             <div
               className="flex items-center justify-center rounded-full shrink-0 text-xs font-semibold"
               style={{ width: 26, height: 26, background: '#1E293B', color: '#94A3B8' }}
             >
               {user?.email?.[0]?.toUpperCase() ?? 'U'}
             </div>
-            <p className="text-xs truncate" style={{ color: '#475569', margin: 0 }}>
-              {user?.email}
-            </p>
-          </div>
+            <div className="min-w-0">
+              <p style={{ color: '#94A3B8', margin: 0, fontSize: 11, fontWeight: 600 }}>
+                Mi cuenta
+              </p>
+              <p className="text-xs truncate" style={{ color: '#475569', margin: 0 }}>
+                {user?.email}
+              </p>
+            </div>
+          </NavLink>
           <button
             onClick={onLogout}
             className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-transparent hover:bg-red-500/10"
@@ -130,7 +141,7 @@ function Dashboard({ user, onLogout }) {
 
         {/* Topbar mobile */}
         <div
-          className="mobile-topbar flex items-center px-4 bg-white shrink-0"
+          className="mobile-topbar flex items-center justify-between px-4 bg-white shrink-0"
           style={{ height: 54, borderBottom: '1px solid #E2E8F0' }}
         >
           <div className="flex items-center gap-2.5">
@@ -144,6 +155,14 @@ function Dashboard({ user, onLogout }) {
               BarberApp
             </span>
           </div>
+          <NavLink
+            to="cuenta"
+            className="mobile-account-link"
+            aria-label="Mi cuenta"
+          >
+            <UserCircle size={18} />
+            <span>Mi cuenta</span>
+          </NavLink>
         </div>
 
         <div className="dashboard-content flex-1 overflow-y-auto">
@@ -229,17 +248,27 @@ function Dashboard({ user, onLogout }) {
           className="px-3 py-4 shrink-0"
           style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
         >
-          <div className="flex items-center gap-2.5 px-1 mb-3">
+          <NavLink
+            to="cuenta"
+            onClick={closeDrawer}
+            className="flex items-center gap-2.5 px-1 mb-3 rounded-lg transition-colors hover:bg-white/5"
+            style={{ textDecoration: 'none', paddingTop: 7, paddingBottom: 7 }}
+          >
             <div
               className="flex items-center justify-center rounded-full shrink-0 text-xs font-semibold"
               style={{ width: 28, height: 28, background: '#1E293B', color: '#94A3B8' }}
             >
               {user?.email?.[0]?.toUpperCase() ?? 'U'}
             </div>
-            <p className="text-xs truncate" style={{ color: '#475569', margin: 0 }}>
-              {user?.email}
-            </p>
-          </div>
+            <div className="min-w-0">
+              <p style={{ color: '#94A3B8', margin: 0, fontSize: 12, fontWeight: 600 }}>
+                Mi cuenta
+              </p>
+              <p className="text-xs truncate" style={{ color: '#475569', margin: 0 }}>
+                {user?.email}
+              </p>
+            </div>
+          </NavLink>
           <button
             onClick={onLogout}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-transparent hover:bg-red-500/10"
