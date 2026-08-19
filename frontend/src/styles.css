@@ -1552,10 +1552,57 @@ tr:hover td {
 .turno-row-editing td {
   padding-left: 6px;
   padding-right: 6px;
+  background: #F8FBFF;
 }
 
 .turno-edit-hide {
   display: none;
+}
+
+.turno-edit-panel-row td {
+  padding: 0;
+  background: #F8FAFC;
+  overflow: visible;
+}
+
+.turno-edit-panel {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  gap: 10px;
+  padding: 14px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: #F8FAFC;
+}
+
+.turno-edit-panel label {
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.turno-edit-panel input,
+.turno-edit-panel select {
+  width: 100%;
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.turno-edit-actions {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+
+.turno-edit-actions button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .turnos-mobile-list {
@@ -1695,6 +1742,10 @@ tr:hover td {
   .turnos-table td:last-child button {
     padding: 5px 7px !important;
   }
+
+  .turno-edit-panel {
+    grid-template-columns: repeat(3, minmax(140px, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
@@ -1714,6 +1765,15 @@ tr:hover td {
   }
   .turno-pagos-head {
     align-items: flex-start;
+  }
+
+  .turno-edit-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .turno-edit-actions {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   .turno-pagos-panel {

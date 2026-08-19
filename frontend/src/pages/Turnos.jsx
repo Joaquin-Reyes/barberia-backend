@@ -356,7 +356,7 @@ export default function Turnos({ user }) {
   const [horarios, setHorarios] = useState([]);
   const [toast, setToast] = useState(null);
   const [nuevo, setNuevo] = useState({
-    nombre: "", telefono: "", servicio: "", precio: 0, barbero: "", fecha: "", hora: "",
+    nombre: "", telefono: "", servicio: "", precio: "", barbero: "", fecha: "", hora: "",
   });
   const [busqueda, setBusqueda] = useState("");
   const [filtroFecha, setFiltroFecha] = useState("");
@@ -475,6 +475,30 @@ export default function Turnos({ user }) {
     setHorarios([]);
   };
 
+  const precioManual = (valor) => Number(String(valor || 0).replace(",", "."));
+  const servicioConfigurado = (nombre) => servicios.find((s) => s.nombre === nombre);
+
+  function actualizarNuevoServicio(nombre) {
+    const seleccionado = servicioConfigurado(nombre);
+    setNuevo((actual) => ({
+      ...actual,
+      servicio: nombre,
+      precio: seleccionado ? seleccionado.precio : actual.precio,
+    }));
+  }
+
+  function actualizarServicioEditado(nombre) {
+    const seleccionado = servicioConfigurado(nombre);
+    setEditando((actual) => ({
+      ...actual,
+      valores: {
+        ...actual.valores,
+        servicio: nombre,
+        precio: seleccionado ? seleccionado.precio : actual.valores.precio,
+      },
+    }));
+  }
+
   const normHora = (h) => String(h || "").slice(0, 5).replace(/^(\d):/, "0$1:");
   const esMediaHora = (h) => ["00", "30"].includes(normHora(h).split(":")[1]);
   const compararTurnosPorHorario = (a, b) =>
@@ -518,6 +542,7 @@ export default function Turnos({ user }) {
         nombre: turno.nombre || "",
         telefono: turno.telefono || "",
         servicio: turno.servicio || "",
+        precio: turno.precio ?? "",
         barbero: turno.barbero || "",
         fecha: turno.fecha || "",
         hora: normHora(turno.hora),
@@ -560,7 +585,6 @@ export default function Turnos({ user }) {
       return;
     }
 
-    const servicioSeleccionado = servicios.find((s) => s.nombre === valores.servicio);
     const cambioAgenda = turno && (
       turno.fecha !== valores.fecha ||
       turno.barbero !== valores.barbero ||
@@ -570,8 +594,8 @@ export default function Turnos({ user }) {
     const cambios = {
       nombre: valores.nombre.trim(),
       telefono: valores.telefono.trim(),
-      servicio: valores.servicio,
-      precio: servicioSeleccionado ? servicioSeleccionado.precio : turno?.precio || 0,
+      servicio: valores.servicio.trim(),
+      precio: precioManual(valores.precio),
       barbero: valores.barbero,
       fecha: valores.fecha,
       hora: horaNormalizada,
@@ -634,6 +658,11 @@ export default function Turnos({ user }) {
               <h2 style={{ margin: 0 }}>Crear turno</h2>
             </div>
             <div className="form-grid">
+              <datalist id="servicios-turno-list">
+                {servicios.map((s) => (
+                  <option key={s.id} value={s.nombre} />
+                ))}
+              </datalist>
               <input
                 placeholder="Nombre del cliente"
                 value={nuevo.nombre}
@@ -644,20 +673,20 @@ export default function Turnos({ user }) {
                 value={nuevo.telefono}
                 onChange={(e) => setNuevo({ ...nuevo, telefono: e.target.value })}
               />
-              <select
+              <input
+                list="servicios-turno-list"
+                placeholder="Servicio"
                 value={nuevo.servicio}
-                onChange={(e) => {
-                  const seleccionado = servicios.find(s => s.nombre === e.target.value);
-                  setNuevo({ ...nuevo, servicio: e.target.value, precio: seleccionado ? seleccionado.precio : 0 });
-                }}
-              >
-                <option value="">Seleccionar servicio</option>
-                {servicios.map((s) => (
-                  <option key={s.id} value={s.nombre}>
-                    {s.nombre} - ${s.precio.toLocaleString("es-AR")}
-                  </option>
-                ))}
-              </select>
+                onChange={(e) => actualizarNuevoServicio(e.target.value)}
+              />
+              <input
+                placeholder="Precio"
+                type="number"
+                min="0"
+                step="1"
+                value={nuevo.precio}
+                onChange={(e) => setNuevo({ ...nuevo, precio: e.target.value })}
+              />
               <select value={nuevo.barbero} onChange={(e) => handleBarberoChange(e.target.value)}>
                 <option value="">Seleccionar barbero</option>
                 {barberos.map((b) => (
@@ -714,7 +743,7 @@ export default function Turnos({ user }) {
                       if (res.ok) {
                         mostrarToast("Turno creado correctamente");
                         traerTurnos();
-                        setNuevo({ nombre: "", telefono: "", servicio: "", precio: 0, barbero: "", fecha: "", hora: "" });
+                        setNuevo({ nombre: "", telefono: "", servicio: "", precio: "", barbero: "", fecha: "", hora: "" });
                       } else {
                         mostrarToast(data.error || "Error al crear turno", "error");
                       }
@@ -767,7 +796,7 @@ export default function Turnos({ user }) {
               const pagoInfo = pagosPorTurno[t.id];
               const pagoAbierto = turnoPagosAbierto === t.id;
               const precioActual = enEdicion
-                ? (servicios.find((s) => s.nombre === valores.servicio)?.precio ?? t.precio)
+                ? precioManual(valores.precio)
                 : (pagoInfo?.total_cobrable ?? t.precio);
 
               return (
@@ -785,14 +814,20 @@ export default function Turnos({ user }) {
                         onChange={(e) => actualizarEdicion("telefono", e.target.value)}
                         placeholder="Telefono"
                       />
-                      <select value={valores.servicio} onChange={(e) => actualizarEdicion("servicio", e.target.value)}>
-                        <option value="">Sin servicio</option>
-                        {servicios.map((s) => (
-                          <option key={s.id} value={s.nombre}>
-                            {s.nombre} - ${s.precio.toLocaleString("es-AR")}
-                          </option>
-                        ))}
-                      </select>
+                      <input
+                        list="servicios-turno-list"
+                        value={valores.servicio}
+                        onChange={(e) => actualizarServicioEditado(e.target.value)}
+                        placeholder="Servicio"
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={valores.precio}
+                        onChange={(e) => actualizarEdicion("precio", e.target.value)}
+                        placeholder="Precio"
+                      />
                       <select value={valores.barbero} onChange={(e) => actualizarEdicion("barbero", e.target.value)}>
                         <option value="">Sin asignar</option>
                         {barberos.map((b) => <option key={b.id} value={b.nombre}>{b.nombre}</option>)}
@@ -917,119 +952,44 @@ export default function Turnos({ user }) {
                 {turnosFiltrados.map((t) => {
                   const enEdicion = editando.id === t.id;
                   const valores = enEdicion ? editando.valores : null;
-                  const inputStyle = { width: "100%", minWidth: 0, maxWidth: "100%", padding: "6px 7px", fontSize: 13, margin: 0 };
                   const pagoInfo = pagosPorTurno[t.id];
                   const pagoAbierto = turnoPagosAbierto === t.id;
 
                   return (
                     <Fragment key={t.id}>
                     <tr className={`group${enEdicion ? " turno-row-editing" : ""}`}>
-                      <td>
-                        {enEdicion ? (
-                          <input
-                            autoFocus
-                            value={valores.nombre}
-                            onChange={(e) => actualizarEdicion("nombre", e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") guardarEdicionFila();
-                              if (e.key === "Escape") setEditando({ id: null, valores: null });
-                            }}
-                            style={inputStyle}
-                          />
-                        ) : t.nombre}
-                      </td>
+                      <td>{t.nombre}</td>
                       <td className="col-mobile-hide" style={{ color: "#475569" }}>
-                        {enEdicion ? (
-                          <input
-                            value={valores.telefono}
-                            onChange={(e) => actualizarEdicion("telefono", e.target.value)}
-                            style={inputStyle}
-                          />
-                        ) : (t.telefono || <span style={{ color: "#94A3B8" }}>Sin teléfono</span>)}
+                        {t.telefono || <span style={{ color: "#94A3B8" }}>Sin teléfono</span>}
                       </td>
+                      <td>{t.servicio || <span style={{ color: "#94A3B8" }}>Sin servicio</span>}</td>
                       <td>
-                        {enEdicion ? (
-                          <select
-                            value={valores.servicio}
-                            onChange={(e) => actualizarEdicion("servicio", e.target.value)}
-                            style={inputStyle}
-                          >
-                            <option value="">Sin servicio</option>
-                            {servicios.map((s) => (
-                              <option key={s.id} value={s.nombre}>
-                                {s.nombre} - ${s.precio.toLocaleString("es-AR")}
-                              </option>
-                            ))}
-                          </select>
-                        ) : t.servicio}
-                      </td>
-                      <td>
-                        {enEdicion ? (
-                          <select
-                            value={valores.barbero}
-                            onChange={(e) => actualizarEdicion("barbero", e.target.value)}
-                            style={inputStyle}
-                          >
-                            <option value="">Sin asignar</option>
-                            {barberos.map((b) => (
-                              <option key={b.id} value={b.nombre}>{b.nombre}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span style={{ color: t.barbero ? "#475569" : "#94A3B8" }}>
-                            {t.barbero || "Sin asignar"}
-                          </span>
-                        )}
+                        <span style={{ color: t.barbero ? "#475569" : "#94A3B8" }}>
+                          {t.barbero || "Sin asignar"}
+                        </span>
                       </td>
                       <td style={{ color: "#475569", whiteSpace: "nowrap" }}>
-                        {enEdicion ? (
-                          <input
-                            type="date"
-                            value={valores.fecha}
-                            onChange={(e) => actualizarEdicion("fecha", e.target.value)}
-                            style={inputStyle}
-                          />
-                        ) : t.fecha}
+                        {t.fecha}
                       </td>
                       <td style={{ color: "#475569" }}>
-                        {enEdicion ? (
-                          <input
-                            type="time"
-                            step="1800"
-                            value={valores.hora}
-                            onChange={(e) => actualizarEdicion("hora", e.target.value)}
-                            style={inputStyle}
-                          />
-                        ) : normHora(t.hora)}
+                        {normHora(t.hora)}
                       </td>
                       <td>
-                        {enEdicion ? (
-                          <select
-                            value={valores.estado}
-                            onChange={(e) => actualizarEdicion("estado", e.target.value)}
-                            style={inputStyle}
-                          >
-                            <option value="pendiente">pendiente</option>
-                            <option value="confirmado">confirmado</option>
-                            <option value="completado">completado</option>
-                            <option value="cancelado">cancelado</option>
-                          </select>
-                        ) : (
-                          <span
-                            className={`estado ${t.estado || "pendiente"}`}
-                            onClick={() => {
-                              const orden = ["pendiente", "confirmado", "completado"];
-                              const index = orden.indexOf(t.estado || "pendiente");
-                              cambiarEstado(t.id, orden[(index + 1) % orden.length]);
-                            }}
-                          >
-                            {t.estado || "pendiente"}
-                          </span>
-                        )}
+                        <span
+                          className={`estado ${t.estado || "pendiente"}`}
+                          onClick={() => {
+                            if (enEdicion) return;
+                            const orden = ["pendiente", "confirmado", "completado"];
+                            const index = orden.indexOf(t.estado || "pendiente");
+                            cambiarEstado(t.id, orden[(index + 1) % orden.length]);
+                          }}
+                        >
+                          {t.estado || "pendiente"}
+                        </span>
                       </td>
                       {puedeAdministrarTurnos && (
-                        <td className={enEdicion ? "turno-edit-hide" : ""} style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
-                          {money(enEdicion ? (servicios.find((s) => s.nombre === valores.servicio)?.precio ?? t.precio) : (pagoInfo?.total_cobrable ?? t.precio))}
+                        <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+                          {money(enEdicion ? precioManual(valores.precio) : (pagoInfo?.total_cobrable ?? t.precio))}
                           {pagoInfo?.total_productos > 0 && (
                             <div style={{ fontSize: 11, color: "#64748B", fontWeight: 400 }}>
                               Incluye productos
@@ -1038,7 +998,7 @@ export default function Turnos({ user }) {
                         </td>
                       )}
                       {puedeAdministrarTurnos && (
-                        <td className={enEdicion ? "turno-edit-hide" : ""}>
+                        <td>
                           <div style={{ display: "grid", gap: 4 }}>
                             <PagoBadge estado={estadoPagoTurno(t, pagoInfo)} />
                             {pagoInfo && (
@@ -1105,6 +1065,93 @@ export default function Turnos({ user }) {
                         </td>
                       )}
                     </tr>
+                    {puedeAdministrarTurnos && enEdicion && (
+                      <tr className="turno-edit-panel-row">
+                        <td colSpan={10}>
+                          <form
+                            className="turno-edit-panel"
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              guardarEdicionFila();
+                            }}
+                          >
+                            <label>
+                              Cliente
+                              <input
+                                autoFocus
+                                value={valores.nombre}
+                                onChange={(e) => actualizarEdicion("nombre", e.target.value)}
+                              />
+                            </label>
+                            <label>
+                              Telefono
+                              <input
+                                value={valores.telefono}
+                                onChange={(e) => actualizarEdicion("telefono", e.target.value)}
+                              />
+                            </label>
+                            <label>
+                              Servicio
+                              <input
+                                list="servicios-turno-list"
+                                value={valores.servicio}
+                                onChange={(e) => actualizarServicioEditado(e.target.value)}
+                              />
+                            </label>
+                            <label>
+                              Precio
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={valores.precio}
+                                onChange={(e) => actualizarEdicion("precio", e.target.value)}
+                              />
+                            </label>
+                            <label>
+                              Barbero
+                              <select value={valores.barbero} onChange={(e) => actualizarEdicion("barbero", e.target.value)}>
+                                <option value="">Sin asignar</option>
+                                {barberos.map((b) => (
+                                  <option key={b.id} value={b.nombre}>{b.nombre}</option>
+                                ))}
+                              </select>
+                            </label>
+                            <label>
+                              Fecha
+                              <input type="date" value={valores.fecha} onChange={(e) => actualizarEdicion("fecha", e.target.value)} />
+                            </label>
+                            <label>
+                              Hora
+                              <input type="time" step="1800" value={valores.hora} onChange={(e) => actualizarEdicion("hora", e.target.value)} />
+                            </label>
+                            <label>
+                              Estado
+                              <select value={valores.estado} onChange={(e) => actualizarEdicion("estado", e.target.value)}>
+                                <option value="pendiente">pendiente</option>
+                                <option value="confirmado">confirmado</option>
+                                <option value="completado">completado</option>
+                                <option value="cancelado">cancelado</option>
+                              </select>
+                            </label>
+                            <div className="turno-edit-actions">
+                              <button type="submit">
+                                <Check size={14} />
+                                Guardar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditando({ id: null, valores: null })}
+                                className="btn-delete"
+                              >
+                                <X size={14} />
+                                Cancelar
+                              </button>
+                            </div>
+                          </form>
+                        </td>
+                      </tr>
+                    )}
                     {puedeAdministrarTurnos && pagoAbierto && (
                       <tr>
                         <td colSpan={10} style={{ padding: 0, background: "#F8FAFC" }}>
