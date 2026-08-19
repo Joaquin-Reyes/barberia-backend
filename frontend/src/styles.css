@@ -1499,8 +1499,8 @@ tr:hover td {
 }
 
 .turnos-table table {
-  table-layout: fixed;
-  min-width: 0;
+  table-layout: auto;
+  min-width: 1040px;
 }
 
 .turnos-table th,
@@ -1513,6 +1513,23 @@ tr:hover td {
 .turnos-table select {
   min-width: 0;
   max-width: 100%;
+}
+
+.turnos-table th:nth-child(9),
+.turnos-table td:nth-child(9) {
+  min-width: 132px;
+  overflow: visible;
+}
+
+.turnos-table th:last-child,
+.turnos-table td:last-child {
+  width: 114px;
+  min-width: 114px;
+  overflow: visible;
+}
+
+.turnos-table td:last-child > div {
+  flex-wrap: nowrap;
 }
 
 .turno-row-editing td {
@@ -1647,7 +1664,7 @@ tr:hover td {
   border-radius: 10px;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1400px) {
   .turnos-table {
     display: none;
   }
