@@ -30,7 +30,7 @@ function BottomNav({ items, onMenuOpen }) {
           to={to}
           className={({ isActive }) => `bottom-nav-item${isActive ? ' active' : ''}`}
         >
-          <Icon size={20} strokeWidth={1.7} />
+          {createElement(Icon, { size: 20, strokeWidth: 1.7 })}
           <span>{label}</span>
         </NavLink>
       ))}
@@ -49,7 +49,7 @@ function Dashboard({ user, onLogout }) {
   const closeDrawer = () => setDrawerOpen(false)
 
   return (
-    <div className="flex h-screen" style={{ background: '#F8FAFC' }}>
+    <div className="app-shell flex h-screen" style={{ background: '#F8FAFC' }}>
 
       {/* ─── Sidebar desktop ─── */}
       <aside
@@ -137,7 +137,7 @@ function Dashboard({ user, onLogout }) {
       </aside>
 
       {/* ─── Main content ─── */}
-      <main className="flex-1 overflow-y-auto flex flex-col">
+      <main className="app-main flex-1 overflow-y-auto flex flex-col">
 
         {/* Topbar mobile */}
         <div
