@@ -1438,6 +1438,14 @@ tr:hover td {
   color: var(--text-secondary);
 }
 
+.turno-pagos-form small {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
 .turno-pagos-form input,
 .turno-pagos-form select {
   width: 100%;
@@ -1446,6 +1454,16 @@ tr:hover td {
 
 .turno-pagos-form button {
   min-height: 38px;
+}
+
+.turno-pagos-warning {
+  background: #FFFBEB;
+  color: #92400E;
+  border: 1px solid #FDE68A;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  margin-bottom: 10px;
 }
 
 .turno-pagos-error {

@@ -82,21 +82,22 @@ function PagosPanel({ turno, onChanged, onToast }) {
     setError("");
     try {
       const resumen = await pagosApi.byTurno(turno.id);
+      const saldo = Number(resumen?.saldo || 0);
       setData(resumen);
       setForm((prev) => ({
         ...prev,
-        monto: resumen?.saldo > 0 ? String(resumen.saldo) : prev.monto || String(turno.precio || ""),
+        monto: saldo > 0 ? String(saldo) : "",
       }));
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [turno?.id, turno?.precio]);
+  }, [turno?.id]);
 
   useEffect(() => {
     setData(null);
-    setForm({ monto: turno?.precio || "", metodo: "efectivo", tipo: "pago_total", nota: "" });
+    setForm({ monto: "", metodo: "efectivo", tipo: "pago_total", nota: "" });
     cargar();
   }, [cargar, turno?.precio]);
 
@@ -107,17 +108,19 @@ function PagosPanel({ turno, onChanged, onToast }) {
   }, []);
 
   function set(campo, valor) {
+    setError("");
     setForm((prev) => ({ ...prev, [campo]: valor }));
   }
 
   async function registrar(e) {
     e.preventDefault();
     setError("");
+    const monto = Number(form.monto || 0);
     if (cobroBloqueado) {
       setError("El turno ya figura saldado");
       return;
     }
-    if (!Number(form.monto) || Number(form.monto) <= 0) {
+    if (!monto || monto <= 0) {
       setError("Ingresá un monto válido");
       return;
     }
@@ -126,7 +129,7 @@ function PagosPanel({ turno, onChanged, onToast }) {
     try {
       await pagosApi.create({
         turno_id: turno.id,
-        monto: Number(form.monto),
+        monto,
         metodo: form.metodo,
         tipo: form.tipo,
         nota: form.nota || undefined,
@@ -137,6 +140,7 @@ function PagosPanel({ turno, onChanged, onToast }) {
       onToast?.("Pago registrado");
     } catch (err) {
       setError(err.message);
+      await cargar();
     } finally {
       setSaving(false);
     }
@@ -199,6 +203,8 @@ function PagosPanel({ turno, onChanged, onToast }) {
   const pagos = data?.pagos || [];
   const productosTurno = data?.productos || [];
   const activos = pagos.filter((p) => !p.anulado_at);
+  const saldoPendiente = Number(data?.saldo || 0);
+  const montoSuperaSaldo = form.tipo !== "ajuste" && saldoPendiente > 0 && Number(form.monto || 0) > saldoPendiente;
   const cobroBloqueado = data && Number(data.saldo || 0) <= 0 && form.tipo !== "ajuste";
   const estadoLabel = {
     sin_pagar: "Sin pagar",
@@ -305,7 +311,14 @@ function PagosPanel({ turno, onChanged, onToast }) {
       <form className="turno-pagos-form" onSubmit={registrar}>
         <label>
           Monto
-          <input type="number" min="1" step="0.01" value={form.monto} onChange={(e) => set("monto", e.target.value)} />
+          <input
+            type="number"
+            min="1"
+            step="0.01"
+            value={form.monto}
+            onChange={(e) => set("monto", e.target.value)}
+          />
+          {saldoPendiente > 0 && <small>Saldo pendiente: {money(saldoPendiente)}</small>}
         </label>
         <label>
           Método
@@ -325,6 +338,12 @@ function PagosPanel({ turno, onChanged, onToast }) {
         </label>
         <button type="submit" disabled={saving || cobroBloqueado}>{saving ? "Registrando..." : "Registrar pago"}</button>
       </form>
+
+      {montoSuperaSaldo && (
+        <div className="turno-pagos-warning">
+          El monto supera el saldo calculado. Se registrará igual.
+        </div>
+      )}
 
       {error && <div className="turno-pagos-error">{error}</div>}
 

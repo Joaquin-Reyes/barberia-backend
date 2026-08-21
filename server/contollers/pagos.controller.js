@@ -74,18 +74,6 @@ async function getTurnoDeBarberia(req, turnoId) {
   return data;
 }
 
-async function getTotalPagadoTurno(turnoId, barberiaId) {
-  const { data, error } = await supabaseAdmin
-    .from("pagos")
-    .select("monto")
-    .eq("barberia_id", barberiaId)
-    .eq("turno_id", turnoId)
-    .is("anulado_at", null);
-
-  if (error) throw error;
-  return (data || []).reduce((sum, pago) => sum + asMoney(pago.monto), 0);
-}
-
 async function getProductosTurno(turnoId, barberiaId) {
   const { data, error } = await supabaseAdmin
     .from("turno_productos")
@@ -96,15 +84,6 @@ async function getProductosTurno(turnoId, barberiaId) {
 
   if (error) throw error;
   return data || [];
-}
-
-async function getTotalProductosTurno(turnoId, barberiaId) {
-  const productos = await getProductosTurno(turnoId, barberiaId);
-  return productos.reduce((sum, item) => sum + asMoney(item.subtotal), 0);
-}
-
-async function getTotalCobrableTurno(turno, barberiaId) {
-  return asMoney(turno.precio) + await getTotalProductosTurno(turno.id, barberiaId);
 }
 
 async function tieneCierreCaja(barberiaId, fecha) {
@@ -149,13 +128,6 @@ function buildResumenPagoTurno(turno, totalProductos, pagos = [], options = {}) 
     estado_pago: pagoHistorico ? "pagado" : getEstadoPago(totalCobrable, totalPagado, pagos),
     pago_historico: pagoHistorico,
   };
-}
-
-function pagoSuperaSaldo({ tipo, precio, totalPagado, monto }) {
-  if (tipo === "ajuste") return false;
-  const precioNumber = asMoney(precio);
-  if (precioNumber <= 0) return false;
-  return asMoney(totalPagado) + asMoney(monto) > precioNumber;
 }
 
 async function getPagosTurno(req, res) {
@@ -263,15 +235,6 @@ async function createPago(req, res) {
   const fechaPago = businessDate();
   if (await tieneCierreCaja(getBarberiaId(req), fechaPago)) {
     return res.status(409).json({ error: "La caja de hoy ya está cerrada. Anulá el cierre antes de registrar otro pago." });
-  }
-
-  const totalPagado = await getTotalPagadoTurno(turno.id, getBarberiaId(req));
-  const precio = await getTotalCobrableTurno(turno, getBarberiaId(req));
-  if (pagoSuperaSaldo({ tipo, precio, totalPagado, monto })) {
-    return res.status(400).json({
-      error: "El pago supera el saldo pendiente",
-      detalle: `Saldo pendiente: ${Math.max(precio - totalPagado, 0)}`,
-    });
   }
 
   const { data, error } = await supabaseAdmin
