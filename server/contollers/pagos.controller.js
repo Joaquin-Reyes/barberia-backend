@@ -583,6 +583,5 @@ module.exports = {
   getResumenCaja,
   listCierresCaja,
   listTurnosParaCobrar,
-  pagoSuperaSaldo,
   removeProductoTurno,
 };
