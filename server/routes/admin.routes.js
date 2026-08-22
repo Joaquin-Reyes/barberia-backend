@@ -2,6 +2,7 @@ const express = require("express");
 const path = require("path");
 const router = express.Router();
 const authMiddleware = require("../middleware/auth");
+const { requireRoles } = require("../middleware/roles");
 const {
   crearTurno,
   listarTurnos,
@@ -53,8 +54,8 @@ router.use("/", (req, res, next) => {
 router.use(express.static(path.join(__dirname, "../admin")));
 
 // API routes de turnos
-router.get("/turnos", listarTurnos);
-router.put("/turnos/:id", actualizarEstadoTurno);
-router.delete("/turnos/:id", eliminarTurno);
+router.get("/turnos", authMiddleware, requireRoles("admin", "superadmin"), listarTurnos);
+router.put("/turnos/:id", authMiddleware, requireRoles("admin", "superadmin", "barbero"), actualizarEstadoTurno);
+router.delete("/turnos/:id", authMiddleware, requireRoles("admin", "superadmin"), eliminarTurno);
 
 module.exports = router;

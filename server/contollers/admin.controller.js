@@ -3,6 +3,8 @@ const { notificarBarbero, enviarTemplateConfirmacion } = require("../services/wh
 const { formatearHora, obtenerHorariosDisponibles } = require("../services/agenda.service");
 const wwebjsManager = require("../services/wwebjs.manager");
 
+const ESTADOS_TURNO = ["pendiente", "confirmado", "completado", "cancelado"];
+
 function isWhatsappDirectChatId(chatId) {
   if (!chatId) return false;
   if (chatId === "status@broadcast") return false;
@@ -31,7 +33,8 @@ async function crearTurno(req, res) {
       .select("*")
       .eq("hora", horaNormalizada)
       .eq("barbero", barbero)
-      .eq("fecha", fecha);
+      .eq("fecha", fecha)
+      .eq("barberia_id", barberia_id);
 
     if (errorBusqueda) {
       console.log("❌ Error verificando turnos:", errorBusqueda);
@@ -40,6 +43,24 @@ async function crearTurno(req, res) {
 
     if (turnosExistentes.length > 0) {
       return res.status(400).json({ error: "Horario ocupado" });
+    }
+
+    if (barbero) {
+      const { data: barberoExiste, error: errorBarberoExiste } = await supabaseAdmin
+        .from("barberos")
+        .select("id")
+        .ilike("nombre", barbero)
+        .eq("barberia_id", barberia_id)
+        .maybeSingle();
+
+      if (errorBarberoExiste) {
+        console.log("❌ Error validando barbero:", errorBarberoExiste);
+        return res.status(500).json({ error: "Error validando barbero" });
+      }
+
+      if (!barberoExiste) {
+        return res.status(400).json({ error: "Barbero no encontrado" });
+      }
     }
 
     const { error: errorInsert } = await supabaseAdmin.from("turnos").insert([{
@@ -113,8 +134,12 @@ async function crearTurno(req, res) {
 
 async function listarTurnos(req, res) {
   const { fecha } = req.query;
+  const barberia_id = req.user.barberia_id;
 
-  let query = supabaseAdmin.from("turnos").select("*");
+  let query = supabaseAdmin
+    .from("turnos")
+    .select("*")
+    .eq("barberia_id", barberia_id);
   if (fecha) query = query.eq("fecha", fecha);
 
   const { data, error } = await query.order("hora", { ascending: true });
@@ -125,11 +150,37 @@ async function listarTurnos(req, res) {
 async function actualizarEstadoTurno(req, res) {
   const { id } = req.params;
   const { estado } = req.body;
+  const barberia_id = req.user.barberia_id;
 
-  const { error } = await supabaseAdmin
+  if (!ESTADOS_TURNO.includes(estado)) {
+    return res.status(400).json({ error: "Estado invalido" });
+  }
+
+  let query = supabaseAdmin
     .from("turnos")
     .update({ estado })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("barberia_id", barberia_id);
+
+  if (req.user.rol === "barbero") {
+    if (estado !== "completado") {
+      return res.status(403).json({ error: "No tenés permisos para esta acción" });
+    }
+
+    const { data: barbero, error: barberoError } = await supabaseAdmin
+      .from("barberos")
+      .select("nombre")
+      .eq("usuario_id", req.user.id)
+      .eq("barberia_id", barberia_id)
+      .maybeSingle();
+
+    if (barberoError) return res.status(500).json({ error: "Error validando permisos" });
+    if (!barbero) return res.json({ ok: true });
+
+    query = query.eq("barbero", barbero.nombre);
+  }
+
+  const { error } = await query;
 
   if (error) return res.status(500).json({ error });
   res.json({ ok: true });
@@ -137,11 +188,13 @@ async function actualizarEstadoTurno(req, res) {
 
 async function eliminarTurno(req, res) {
   const { id } = req.params;
+  const barberia_id = req.user.barberia_id;
 
   const { error } = await supabaseAdmin
     .from("turnos")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("barberia_id", barberia_id);
 
   if (error) return res.status(500).json({ error });
   res.json({ ok: true });

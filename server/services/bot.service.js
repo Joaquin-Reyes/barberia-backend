@@ -444,7 +444,7 @@ async function _procesarMensajeInterno({ from, text, cliente, barberia, barberia
 
   if (usuario.estado === "cancelar_confirmacion") {
     if (mensaje === "1") {
-      const ok = await eliminarTurno(usuario.turnoACancelar.id);
+      const ok = await eliminarTurno(usuario.turnoACancelar.id, barberia_id);
       usuario.estado = "menu";
       if (ok) {
         await enviarMensaje(from, "✅ Turno cancelado correctamente.");
@@ -538,7 +538,7 @@ async function _procesarMensajeInterno({ from, text, cliente, barberia, barberia
 
   if (usuario.estado === "confirmacion") {
     if (mensaje === "1") {
-      const disponible = await turnoDisponible(usuario.fecha, usuario.horario, usuario.barbero);
+      const disponible = await turnoDisponible(usuario.fecha, usuario.horario, usuario.barbero, barberia_id);
 
       if (!disponible) {
         usuario.estado = "horario";

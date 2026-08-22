@@ -58,13 +58,14 @@ export async function guardarTurno(turno) {
 }
 
 // VALIDAR DISPONIBILIDAD
-export async function turnoDisponible(fecha, hora, barbero) {
+export async function turnoDisponible(fecha, hora, barbero, barberia_id) {
   const { data, error } = await supabase
     .from("turnos")
     .select("*")
     .eq("hora", hora)
     .eq("barbero", barbero)
-    .eq("fecha", fecha);
+    .eq("fecha", fecha)
+    .eq("barberia_id", barberia_id);
 
   if (error) {
     console.error("Error verificando turno:", error);

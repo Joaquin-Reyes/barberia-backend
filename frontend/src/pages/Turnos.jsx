@@ -530,9 +530,10 @@ export default function Turnos({ user }) {
 
   async function cambiarEstado(id, nuevoEstado) {
     try {
+      const token = await getAuthToken();
       await fetch(`${API}/admin/turnos/${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ estado: nuevoEstado }),
       });
       traerTurnos();
@@ -745,7 +746,7 @@ export default function Turnos({ user }) {
                       return;
                     }
                     const disponible = nuevo.barbero
-                      ? await turnoDisponible(nuevo.fecha, nuevo.hora, nuevo.barbero)
+                      ? await turnoDisponible(nuevo.fecha, nuevo.hora, nuevo.barbero, barberiaId)
                       : true;
                     if (!disponible) {
                       mostrarToast("Ese horario ya esta ocupado", "error");

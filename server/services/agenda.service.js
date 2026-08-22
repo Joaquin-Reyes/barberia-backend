@@ -82,6 +82,7 @@ async function obtenerHorariosDisponibles(barberoNombre, barberia_id, fecha) {
     .from("excepciones_barbero")
     .select("*")
     .eq("barbero_id", barbero_id)
+    .eq("barberia_id", barberia_id)
     .eq("fecha", fecha)
     .maybeSingle();
 
@@ -105,6 +106,7 @@ async function obtenerHorariosDisponibles(barberoNombre, barberia_id, fecha) {
     .from("horarios_barbero")
     .select("hora_inicio, hora_fin")
     .eq("barbero_id", barbero_id)
+    .eq("barberia_id", barberia_id)
     .eq("dia_semana", diaSemana)
     .maybeSingle();
 
@@ -120,11 +122,17 @@ async function obtenerHorariosDisponibles(barberoNombre, barberia_id, fecha) {
   return await filtrarOcupados(slots, barberoNombre, barberia_id, fecha);
 }
 
-async function eliminarTurno(id) {
+async function eliminarTurno(id, barberia_id) {
+  if (!barberia_id) {
+    console.log("❌ eliminarTurno requiere barberia_id");
+    return false;
+  }
+
   const { error } = await supabaseAdmin
     .from("turnos")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("barberia_id", barberia_id);
 
   if (error) {
     console.log("❌ Error eliminando:", error);
@@ -148,13 +156,19 @@ async function obtenerTurnos(telefono, barberia_id) {
   return data;
 }
 
-async function turnoDisponible(fecha, hora, barbero) {
+async function turnoDisponible(fecha, hora, barbero, barberia_id) {
+  if (!barberia_id) {
+    console.log("❌ turnoDisponible requiere barberia_id");
+    return false;
+  }
+
   const { data, error } = await supabaseAdmin
     .from("turnos")
     .select("*")
     .eq("hora", formatearHora(hora))
     .eq("barbero", barbero)
-    .eq("fecha", fecha);
+    .eq("fecha", fecha)
+    .eq("barberia_id", barberia_id);
 
   if (error) {
     console.log("❌ Error verificando disponibilidad:", error);
@@ -231,7 +245,8 @@ async function enviarRecordatorios() {
       await supabaseAdmin
         .from("turnos")
         .update({ recordatorio_24h: true })
-        .eq("id", turno.id);
+        .eq("id", turno.id)
+        .eq("barberia_id", turno.barberia_id);
     }
 
     if (
@@ -247,7 +262,8 @@ async function enviarRecordatorios() {
       await supabaseAdmin
         .from("turnos")
         .update({ recordatorio_3h: true })
-        .eq("id", turno.id);
+        .eq("id", turno.id)
+        .eq("barberia_id", turno.barberia_id);
     }
   }
 }
