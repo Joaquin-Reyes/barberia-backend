@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { Check, Plus, Search, Pencil, X, WalletCards, Trash2 } from "lucide-react";
 import { supabase, turnoDisponible, getAuthToken } from "../lib/supabase";
-import { pagos as pagosApi, productos as productosApi } from "../lib/api";
+import { pagos as pagosApi, productos as productosApi, turnos as turnosApi } from "../lib/api";
 
 const API = "https://barberia-backend-production-7dae.up.railway.app";
 
@@ -623,21 +623,24 @@ export default function Turnos({ user }) {
       ...(cambioAgenda ? { recordatorio_24h: false, recordatorio_3h: false } : {}),
     };
 
-    const { error } = await supabase.from("turnos").update(cambios).eq("id", id);
-    if (error) {
-      mostrarToast("No se pudo guardar el turno", "error");
-      return;
+    try {
+      await turnosApi.update(id, cambios);
+      mostrarToast("Turno actualizado");
+      setEditando({ id: null, valores: null });
+      traerTurnos();
+    } catch (err) {
+      mostrarToast(err.message || "No se pudo guardar el turno", "error");
     }
-
-    mostrarToast("Turno actualizado");
-    setEditando({ id: null, valores: null });
-    traerTurnos();
   }
 
   async function eliminarTurno(turno) {
     if (!window.confirm(`Eliminar el turno de ${turno.nombre}?`)) return;
-    await supabase.from("turnos").delete().eq("id", turno.id);
-    traerTurnos();
+    try {
+      await turnosApi.delete(turno.id);
+      traerTurnos();
+    } catch (err) {
+      mostrarToast(err.message || "No se pudo eliminar el turno", "error");
+    }
   }
 
   const pendientes  = turnos.filter(t => t.estado === "pendiente").length;
@@ -1068,11 +1071,7 @@ export default function Turnos({ user }) {
                                   <Pencil size={13} />
                                 </button>
                                 <button
-                                  onClick={async () => {
-                                    if (!window.confirm(`¿Eliminar el turno de ${t.nombre}?`)) return;
-                                    await supabase.from("turnos").delete().eq("id", t.id);
-                                    traerTurnos();
-                                  }}
+                                  onClick={() => eliminarTurno(t)}
                                   className="btn-delete"
                                   style={{ padding: "5px 8px", display: "flex", alignItems: "center" }}
                                   aria-label="Eliminar turno"

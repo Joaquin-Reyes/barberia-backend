@@ -1,9 +1,12 @@
 const { supabaseAdmin } = require("../config/supabase");
+const { metadataMatchesBarbero } = require("./auth.controller");
 const { notificarBarbero, enviarTemplateConfirmacion } = require("../services/whatsapp.service");
 const { formatearHora, obtenerHorariosDisponibles } = require("../services/agenda.service");
 const wwebjsManager = require("../services/wwebjs.manager");
 
 const ESTADOS_TURNO = ["pendiente", "confirmado", "completado", "cancelado"];
+const CAMPOS_TURNO_ADMIN = ["nombre", "telefono", "servicio", "precio", "barbero", "fecha", "hora", "estado"];
+const CAMPOS_PROHIBIDOS_TURNO = ["id", "barberia_id", "created_at", "updated_at", "usuario_id"];
 
 function isWhatsappDirectChatId(chatId) {
   if (!chatId) return false;
@@ -12,6 +15,13 @@ function isWhatsappDirectChatId(chatId) {
   if (chatId.endsWith("@g.us")) return false;
   if (chatId.includes("broadcast")) return false;
   return chatId.includes("@");
+}
+
+function esHoraValidaTurno(value) {
+  const hora = String(value || "").trim().slice(0, 5);
+  if (!/^\d{2}:\d{2}$/.test(hora)) return false;
+  const [horas, minutos] = hora.split(":").map(Number);
+  return horas >= 0 && horas <= 23 && ["00", "30"].includes(String(minutos).padStart(2, "0"));
 }
 
 async function crearTurno(req, res) {
@@ -149,20 +159,24 @@ async function listarTurnos(req, res) {
 
 async function actualizarEstadoTurno(req, res) {
   const { id } = req.params;
-  const { estado } = req.body;
+  const body = req.body || {};
+  const { estado } = body;
   const barberia_id = req.user.barberia_id;
 
-  if (!ESTADOS_TURNO.includes(estado)) {
+  if (CAMPOS_PROHIBIDOS_TURNO.some((campo) => Object.prototype.hasOwnProperty.call(body, campo))) {
+    return res.status(400).json({ error: "Campo no permitido" });
+  }
+
+  if (estado !== undefined && !ESTADOS_TURNO.includes(estado)) {
     return res.status(400).json({ error: "Estado invalido" });
   }
 
-  let query = supabaseAdmin
-    .from("turnos")
-    .update({ estado })
-    .eq("id", id)
-    .eq("barberia_id", barberia_id);
-
   if (req.user.rol === "barbero") {
+    const camposRecibidos = Object.keys(body);
+    if (camposRecibidos.length !== 1 || !Object.prototype.hasOwnProperty.call(body, "estado")) {
+      return res.status(403).json({ error: "No tenés permisos para esta acción" });
+    }
+
     if (estado !== "completado") {
       return res.status(403).json({ error: "No tenés permisos para esta acción" });
     }
@@ -177,10 +191,107 @@ async function actualizarEstadoTurno(req, res) {
     if (barberoError) return res.status(500).json({ error: "Error validando permisos" });
     if (!barbero) return res.json({ ok: true });
 
-    query = query.eq("barbero", barbero.nombre);
+    const { error } = await supabaseAdmin
+      .from("turnos")
+      .update({ estado })
+      .eq("id", id)
+      .eq("barberia_id", barberia_id)
+      .eq("barbero", barbero.nombre);
+
+    if (error) return res.status(500).json({ error });
+    return res.json({ ok: true });
   }
 
-  const { error } = await query;
+  const { data: turnoActual, error: errorTurnoActual } = await supabaseAdmin
+    .from("turnos")
+    .select("*")
+    .eq("id", id)
+    .eq("barberia_id", barberia_id)
+    .maybeSingle();
+
+  if (errorTurnoActual) return res.status(500).json({ error: "Error buscando turno" });
+  if (!turnoActual) return res.json({ ok: true });
+
+  const cambios = {};
+  for (const campo of CAMPOS_TURNO_ADMIN) {
+    if (!Object.prototype.hasOwnProperty.call(body, campo)) continue;
+
+    if (["nombre", "telefono", "servicio", "barbero"].includes(campo)) {
+      cambios[campo] = String(body[campo] || "").trim();
+    } else if (campo === "precio") {
+      const precio = Number(body.precio);
+      if (!Number.isFinite(precio) || precio < 0) {
+        return res.status(400).json({ error: "Precio invalido" });
+      }
+      cambios.precio = precio;
+    } else if (campo === "fecha") {
+      const fecha = String(body.fecha || "").trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+        return res.status(400).json({ error: "Fecha invalida" });
+      }
+      cambios.fecha = fecha;
+    } else if (campo === "hora") {
+      if (!esHoraValidaTurno(body.hora)) return res.status(400).json({ error: "Hora invalida" });
+      const horaNormalizada = formatearHora(body.hora);
+      cambios.hora = horaNormalizada;
+    } else if (campo === "estado") {
+      cambios.estado = estado;
+    }
+  }
+
+  if (Object.keys(cambios).length === 0) {
+    return res.status(400).json({ error: "No hay campos validos para actualizar" });
+  }
+
+  if (Object.prototype.hasOwnProperty.call(cambios, "nombre") && !cambios.nombre) {
+    return res.status(400).json({ error: "Nombre requerido" });
+  }
+
+  if (Object.prototype.hasOwnProperty.call(cambios, "barbero") && cambios.barbero) {
+    const { data: barberoExiste, error: errorBarberoExiste } = await supabaseAdmin
+      .from("barberos")
+      .select("id")
+      .ilike("nombre", cambios.barbero)
+      .eq("barberia_id", barberia_id)
+      .maybeSingle();
+
+    if (errorBarberoExiste) return res.status(500).json({ error: "Error validando barbero" });
+    if (!barberoExiste) return res.status(400).json({ error: "Barbero no encontrado" });
+  }
+
+  const fechaFinal = cambios.fecha || turnoActual.fecha;
+  const horaFinal = cambios.hora || formatearHora(turnoActual.hora);
+  const barberoFinal = Object.prototype.hasOwnProperty.call(cambios, "barbero") ? cambios.barbero : turnoActual.barbero;
+  const cambioAgenda =
+    fechaFinal !== turnoActual.fecha ||
+    horaFinal !== formatearHora(turnoActual.hora) ||
+    barberoFinal !== turnoActual.barbero;
+
+  if (barberoFinal && fechaFinal && horaFinal) {
+    const { data: turnosMismoHorario, error: errorOcupado } = await supabaseAdmin
+      .from("turnos")
+      .select("id")
+      .eq("hora", horaFinal)
+      .eq("barbero", barberoFinal)
+      .eq("fecha", fechaFinal)
+      .eq("barberia_id", barberia_id);
+
+    if (errorOcupado) return res.status(500).json({ error: "Error verificando disponibilidad" });
+    if ((turnosMismoHorario || []).some((turno) => turno.id !== id)) {
+      return res.status(400).json({ error: "Horario ocupado" });
+    }
+  }
+
+  if (cambioAgenda) {
+    cambios.recordatorio_24h = false;
+    cambios.recordatorio_3h = false;
+  }
+
+  const { error } = await supabaseAdmin
+    .from("turnos")
+    .update(cambios)
+    .eq("id", id)
+    .eq("barberia_id", barberia_id);
 
   if (error) return res.status(500).json({ error });
   res.json({ ok: true });
@@ -233,10 +344,21 @@ async function crearBarbero(req, res) {
 
     const authUserId = inviteData?.user?.id;
     if (authUserId) {
+      const { data: usuarioExistente } = await supabaseAdmin
+        .from("usuarios")
+        .select("id, rol, barberia_id")
+        .eq("id", authUserId)
+        .maybeSingle();
+
+      if (usuarioExistente && (usuarioExistente.rol !== "barbero" || usuarioExistente.barberia_id !== barberia_id)) {
+        return res.json({ ...data, invite_warning: "Barbero creado pero no se pudo vincular una cuenta existente" });
+      }
+
       const { error: updateError } = await supabaseAdmin
         .from("barberos")
         .update({ usuario_id: authUserId })
-        .eq("id", data.id);
+        .eq("id", data.id)
+        .eq("barberia_id", barberia_id);
 
       if (updateError) {
         console.log("⚠️ No se pudo vincular usuario_id al barbero:", updateError.message);
@@ -396,11 +518,50 @@ async function activarBarberoDirecto({ barbero, email }) {
 
     const { data: existente } = await supabaseAdmin
       .from("usuarios")
-      .select("id")
+      .select("id, rol, barberia_id")
       .eq("id", authUser.id)
       .maybeSingle();
 
-    if (existente) return true; // ya activado
+    if (existente) {
+      if (existente.rol !== "barbero" || existente.barberia_id !== barbero.barberia_id) {
+        console.log("⚠️ activarBarberoDirecto: usuario existente pertenece a otro contexto");
+        return false;
+      }
+
+      const { data: barberoActual } = await supabaseAdmin
+        .from("barberos")
+        .select("id, usuario_id, barberia_id")
+        .eq("id", barbero.id)
+        .eq("barberia_id", barbero.barberia_id)
+        .maybeSingle();
+
+      if (!barberoActual || (barberoActual.usuario_id && barberoActual.usuario_id !== authUser.id)) {
+        console.log("⚠️ activarBarberoDirecto: barbero inexistente o vinculado a otro usuario");
+        return false;
+      }
+
+      const { error: updateErr } = await supabaseAdmin
+        .from("barberos")
+        .update({ usuario_id: authUser.id })
+        .eq("id", barbero.id)
+        .eq("barberia_id", barbero.barberia_id);
+
+      if (updateErr) {
+        console.log("⚠️ activarBarberoDirecto: update de barbero falló:", updateErr.message);
+        return false;
+      }
+
+      return true;
+    }
+
+    if (!metadataMatchesBarbero(authUser.user_metadata || {}, {
+      rol: "barbero",
+      barberia_id: barbero.barberia_id,
+      barbero_id: barbero.id,
+    })) {
+      console.log("⚠️ activarBarberoDirecto: metadata Auth no coincide con la invitación esperada");
+      return false;
+    }
 
     const { error: insertErr } = await supabaseAdmin.from("usuarios").insert({
       id: authUser.id,
@@ -417,7 +578,8 @@ async function activarBarberoDirecto({ barbero, email }) {
     await supabaseAdmin
       .from("barberos")
       .update({ usuario_id: authUser.id })
-      .eq("id", barbero.id);
+      .eq("id", barbero.id)
+      .eq("barberia_id", barbero.barberia_id);
 
     console.log("✅ Activación directa exitosa para", email);
     return true;

@@ -78,3 +78,42 @@ export const productos = {
   }),
   delete: (id) => request(`/api/productos/${id}`, { method: 'DELETE' }),
 }
+
+export const turnos = {
+  update: (id, body) => request(`/admin/turnos/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  }),
+  delete: (id) => request(`/admin/turnos/${id}`, { method: 'DELETE' }),
+}
+
+export const barberia = {
+  updateConfiguracion: (body) => request('/api/barberia/configuracion', {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  }),
+}
+
+export const servicios = {
+  list: () => request('/api/servicios'),
+  create: (body) => request('/api/servicios', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id, body) => request(`/api/servicios/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  }),
+  delete: (id) => request(`/api/servicios/${id}`, { method: 'DELETE' }),
+}
+
+export const agenda = {
+  guardarHorarios: (barberoId, horarios) => request(`/api/agenda/barberos/${barberoId}/horarios`, {
+    method: 'PUT',
+    body: JSON.stringify({ horarios }),
+  }),
+  guardarExcepcion: (barberoId, body) => request(`/api/agenda/barberos/${barberoId}/excepciones`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  }),
+  eliminarExcepcion: (barberoId, id) => request(`/api/agenda/barberos/${barberoId}/excepciones/${id}`, {
+    method: 'DELETE',
+  }),
+}

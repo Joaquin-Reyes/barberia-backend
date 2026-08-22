@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Building2, CheckCircle2, Pencil } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { barberia as barberiaApi } from "../lib/api";
 
 export default function Configuracion({ user }) {
   const barberiaId = user?.barberia_id;
@@ -38,18 +39,18 @@ export default function Configuracion({ user }) {
   };
 
   async function guardarBarberia() {
-    const { error } = await supabase
-      .from("barberias")
-      .update({
+    try {
+      const data = await barberiaApi.updateConfiguracion({
         nombre: barberia.nombre,
         telefono_admin: barberia.telefono_admin,
         whatsapp_number: barberia.whatsapp_number,
-      })
-      .eq("id", user.barberia_id);
-
-    if (error) return mostrarToast("Error al guardar", "error");
-    mostrarToast("Datos guardados correctamente");
-    setEditando(false);
+      });
+      setBarberia(data);
+      mostrarToast("Datos guardados correctamente");
+      setEditando(false);
+    } catch (err) {
+      mostrarToast(err.message || "Error al guardar", "error");
+    }
   }
 
   const labelStyle = {

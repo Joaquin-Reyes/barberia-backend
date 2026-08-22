@@ -43,20 +43,6 @@ export async function getAuthToken() {
 // TURNOS
 // ==============================
 
-// GUARDAR TURNO
-export async function guardarTurno(turno) {
-  const { error } = await supabase
-    .from('turnos')
-    .insert([turno])
-
-  if (error) {
-    console.log("Error guardando:", error)
-    return false
-  }
-
-  return true
-}
-
 // VALIDAR DISPONIBILIDAD
 export async function turnoDisponible(fecha, hora, barbero, barberia_id) {
   const { data, error } = await supabase

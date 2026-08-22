@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, Package, Pencil, Plus, Scissors, X } from "lucide-react";
 import { supabase } from "../lib/supabase";
-import { productos as productosApi } from "../lib/api";
+import { productos as productosApi, servicios as serviciosApi } from "../lib/api";
 
 export default function Servicios({ user }) {
   const barberiaId = user?.barberia_id;
@@ -62,18 +62,17 @@ export default function Servicios({ user }) {
       return;
     }
 
-    const { error } = await supabase
-      .from("servicios")
-      .update({
+    try {
+      await serviciosApi.update(editandoServicio.id, {
         nombre: editandoServicio.nombre,
         precio: parseFloat(editandoServicio.precio),
-      })
-      .eq("id", editandoServicio.id);
-
-    if (error) return mostrarToast("Error al guardar", "error");
-    mostrarToast("Servicio actualizado");
-    setEditandoServicio(null);
-    traerServicios();
+      });
+      mostrarToast("Servicio actualizado");
+      setEditandoServicio(null);
+      traerServicios();
+    } catch (err) {
+      mostrarToast(err.message || "Error al guardar", "error");
+    }
   }
 
   async function guardarProducto() {
@@ -139,15 +138,17 @@ export default function Servicios({ user }) {
                   mostrarToast("Completá nombre y precio", "error");
                   return;
                 }
-                const { error } = await supabase.from("servicios").insert({
-                  nombre: nuevoServicio.nombre,
-                  precio: parseFloat(nuevoServicio.precio),
-                  barberia_id: user.barberia_id,
-                });
-                if (error) return mostrarToast("Error al guardar", "error");
-                mostrarToast("Servicio agregado correctamente");
-                setNuevoServicio({ nombre: "", precio: "" });
-                traerServicios();
+                try {
+                  await serviciosApi.create({
+                    nombre: nuevoServicio.nombre,
+                    precio: parseFloat(nuevoServicio.precio),
+                  });
+                  mostrarToast("Servicio agregado correctamente");
+                  setNuevoServicio({ nombre: "", precio: "" });
+                  traerServicios();
+                } catch (err) {
+                  mostrarToast(err.message || "Error al guardar", "error");
+                }
               }}
             >
               Agregar
@@ -237,9 +238,13 @@ export default function Servicios({ user }) {
                             <button
                               onClick={async () => {
                                 if (!window.confirm(`¿Eliminar el servicio "${s.nombre}"?`)) return;
-                                await supabase.from("servicios").delete().eq("id", s.id);
-                                traerServicios();
-                                mostrarToast("Servicio eliminado");
+                                try {
+                                  await serviciosApi.delete(s.id);
+                                  traerServicios();
+                                  mostrarToast("Servicio eliminado");
+                                } catch (err) {
+                                  mostrarToast(err.message || "Error al eliminar", "error");
+                                }
                               }}
                               className="btn-delete"
                               style={{ padding: "5px 8px", display: "flex", alignItems: "center" }}

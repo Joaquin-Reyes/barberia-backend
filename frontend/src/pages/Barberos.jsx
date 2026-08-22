@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Plus, X, Calendar, AlertCircle, Check, Users, Mail } from "lucide-react";
 import { supabase, getAuthToken } from "../lib/supabase";
+import { agenda as agendaApi } from "../lib/api";
 
 const API = "https://barberia-backend-production-7dae.up.railway.app";
 
@@ -83,20 +84,14 @@ export default function Barberos({ user }) {
     if (!barberoSeleccionado) return;
     setGuardandoHorario(true);
     try {
-      await supabase.from("horarios_barbero").delete().eq("barbero_id", barberoSeleccionado.id);
       const filas = DIAS_SEMANA
         .filter(({ dia }) => horarioSemanal[dia]?.trabaja)
         .map(({ dia }) => ({
-          barbero_id:  barberoSeleccionado.id,
-          barberia_id: user.barberia_id,
           dia_semana:  dia,
           hora_inicio: horarioSemanal[dia].hora_inicio,
           hora_fin:    horarioSemanal[dia].hora_fin,
         }));
-      if (filas.length > 0) {
-        const { error } = await supabase.from("horarios_barbero").insert(filas);
-        if (error) throw error;
-      }
+      await agendaApi.guardarHorarios(barberoSeleccionado.id, filas);
       mostrarToast("Horario guardado correctamente");
     } catch (err) {
       console.error(err);
@@ -128,8 +123,6 @@ export default function Barberos({ user }) {
     if (!nuevaExcepcion.fecha) { mostrarToast("Elegí una fecha", "error"); return; }
 
     const fila = {
-      barbero_id:  barberoSeleccionado.id,
-      barberia_id: user.barberia_id,
       fecha:       nuevaExcepcion.fecha,
       trabaja:     nuevaExcepcion.trabaja,
       hora_inicio: nuevaExcepcion.trabaja && nuevaExcepcion.hora_inicio ? nuevaExcepcion.hora_inicio : null,
@@ -137,10 +130,12 @@ export default function Barberos({ user }) {
       motivo:      nuevaExcepcion.motivo || null,
     };
 
-    const { error } = await supabase
-      .from("excepciones_barbero").upsert(fila, { onConflict: "barbero_id,fecha" });
-
-    if (error) { mostrarToast("Error al guardar excepción", "error"); return; }
+    try {
+      await agendaApi.guardarExcepcion(barberoSeleccionado.id, fila);
+    } catch (err) {
+      mostrarToast(err.message || "Error al guardar excepción", "error");
+      return;
+    }
 
     setNuevaExcepcion({ fecha: "", trabaja: false, hora_inicio: "", hora_fin: "", motivo: "" });
     await cargarExcepciones(barberoSeleccionado.id);
@@ -149,9 +144,13 @@ export default function Barberos({ user }) {
 
   async function eliminarExcepcion(id) {
     if (!window.confirm("¿Eliminar esta excepción de horario?")) return;
-    await supabase.from("excepciones_barbero").delete().eq("id", id);
-    await cargarExcepciones(barberoSeleccionado.id);
-    mostrarToast("Excepción eliminada");
+    try {
+      await agendaApi.eliminarExcepcion(barberoSeleccionado.id, id);
+      await cargarExcepciones(barberoSeleccionado.id);
+      mostrarToast("Excepción eliminada");
+    } catch (err) {
+      mostrarToast(err.message || "Error al eliminar excepción", "error");
+    }
   }
 
   async function reenviarInvitacion() {

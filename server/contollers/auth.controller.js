@@ -53,6 +53,48 @@ function withBarbero(usuario, barbero) {
   };
 }
 
+function metadataError(res) {
+  return res.status(400).json({ error: "No se pudo activar la cuenta. Pedile al admin que reenvíe la invitación." });
+}
+
+function metadataMatchesBarbero(metadata = {}, { rol, barberia_id, barbero_id }) {
+  const metadataBarberoId = getMetadataBarberoId(metadata);
+  return (
+    metadata.rol === rol &&
+    metadata.barberia_id === barberia_id &&
+    metadataBarberoId === barbero_id
+  );
+}
+
+async function getBarberoSeguro(barbero_id, barberia_id) {
+  if (!barbero_id || !barberia_id) return null;
+
+  const { data, error } = await supabaseAdmin
+    .from("barberos")
+    .select("id, nombre, barberia_id, usuario_id")
+    .eq("id", barbero_id)
+    .eq("barberia_id", barberia_id)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data || null;
+}
+
+async function vincularBarberoSeguro({ barbero, userId }) {
+  if (!barbero || (barbero.usuario_id && barbero.usuario_id !== userId)) {
+    return false;
+  }
+
+  const { error } = await supabaseAdmin
+    .from("barberos")
+    .update({ usuario_id: userId })
+    .eq("id", barbero.id)
+    .eq("barberia_id", barbero.barberia_id);
+
+  if (error) throw error;
+  return true;
+}
+
 async function activarCuenta(req, res) {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) return res.status(401).json({ error: "No token" });
@@ -63,150 +105,100 @@ async function activarCuenta(req, res) {
   const metadata = user.user_metadata || {};
   const metadataBarberoId = getMetadataBarberoId(metadata);
 
-  const { data: existente } = await supabaseAdmin
+  const { data: existente, error: existenteError } = await supabaseAdmin
     .from("usuarios")
     .select("*")
     .eq("id", user.id)
     .maybeSingle();
 
+  if (existenteError) return res.status(500).json({ error: "Error activando cuenta" });
+
   const { rol, barberia_id } = metadata;
   const barbero_id = metadataBarberoId;
+  const rolesValidos = ["admin", "barbero", "superadmin"];
+
+  if (!rol || !rolesValidos.includes(rol) || !barberia_id) {
+    console.log("⚠️ Metadata incompleta o invalida para activar usuario:", user.id);
+    return metadataError(res);
+  }
+
+  if (rol === "barbero" && !barbero_id) {
+    console.log("⚠️ Metadata de barbero sin barbero_id para user:", user.id);
+    return metadataError(res);
+  }
+
+  let barberoValidado = null;
+  try {
+    if (rol === "barbero") {
+      barberoValidado = await getBarberoSeguro(barbero_id, barberia_id);
+      if (!barberoValidado) {
+        console.log("⚠️ Metadata inconsistente: barbero no pertenece a barberia");
+        return metadataError(res);
+      }
+    }
+  } catch (err) {
+    console.log("❌ Error validando barbero:", err.message);
+    return res.status(500).json({ error: "Error activando cuenta" });
+  }
 
   if (existente) {
-    // Ya existe — asegurar que barberos.usuario_id esté vinculado
-    const bId = existente.barbero_id || barbero_id;
-    let barberoVinculado = null;
-    if (bId) {
-      await supabaseAdmin
-        .from("barberos")
-        .update({ usuario_id: user.id })
-        .eq("id", bId);
-
-      const { data: barberoData } = await supabaseAdmin
-        .from("barberos")
-        .select("id, nombre")
-        .eq("id", bId)
-        .maybeSingle();
-      barberoVinculado = barberoData;
+    if (existente.barberia_id !== barberia_id || existente.rol !== rol) {
+      console.log("⚠️ Intento de reactivar usuario con tenant/rol diferente:", user.id);
+      return metadataError(res);
     }
 
-    const { data: usuarioActualizado } = await supabaseAdmin
-      .from("usuarios")
-      .select("*")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    return res.json({ ok: true, usuario: withBarbero(usuarioActualizado || existente, barberoVinculado) });
-  }
-
-  // Si la metadata tiene los datos necesarios, crear el usuario directamente
-  if (rol && barberia_id) {
-    const { error: insertError } = await supabaseAdmin
-      .from("usuarios")
-      .insert(buildUsuarioPayload({ id: user.id, email: user.email, rol, barberia_id }));
-
-    if (insertError) {
-      console.log("❌ Error creando usuario:", insertError);
-      return res.status(500).json({ error: "Error creando usuario" });
-    }
-
-    if (barbero_id) {
-      await supabaseAdmin
-        .from("barberos")
-        .update({ usuario_id: user.id })
-        .eq("id", barbero_id);
-    }
-
-    const { data: creado } = await supabaseAdmin.from("usuarios").select("*").eq("id", user.id).maybeSingle();
-    console.log("✅ Activación por metadata para", user.email);
-    if (barbero_id) {
-      const { data: barberoData } = await supabaseAdmin
-        .from("barberos")
-        .select("id, nombre")
-        .eq("id", barbero_id)
-        .maybeSingle();
-      return res.json({ ok: true, usuario: withBarbero(creado, barberoData) });
-    }
-
-    return res.json({ ok: true, usuario: creado });
-  }
-
-  // Fallback: metadata vacía — buscar barbero por barbero_id, usuario_id, o único sin vincular
-  console.log("⚠️ Metadata incompleta para user", user.id, "| metadata:", user.user_metadata, "| intentando fallback");
-
-  // Caso 0: metadata tiene barbero_id aunque le falte rol/barberia_id
-  if (barbero_id) {
-    const { data: barberoById } = await supabaseAdmin
-      .from("barberos")
-      .select("id, nombre, barberia_id")
-      .eq("id", barbero_id)
-      .maybeSingle();
-
-    if (barberoById) {
-      const { error: insertError } = await supabaseAdmin
-        .from("usuarios")
-        .insert(buildUsuarioPayload({ id: user.id, email: user.email, rol: "barbero", barberia_id: barberoById.barberia_id }));
-      if (!insertError) {
-        await supabaseAdmin.from("barberos").update({ usuario_id: user.id }).eq("id", barberoById.id);
-        const { data: creado } = await supabaseAdmin.from("usuarios").select("*").eq("id", user.id).maybeSingle();
-        console.log("✅ Activación por barbero_id en metadata para", user.email);
-        return res.json({ ok: true, usuario: withBarbero(creado, barberoById) });
+    if (rol === "barbero") {
+      try {
+        const vinculado = await vincularBarberoSeguro({ barbero: barberoValidado, userId: user.id });
+        if (!vinculado) {
+          console.log("⚠️ Barbero ya vinculado a otro usuario:", barbero_id);
+          return metadataError(res);
+        }
+      } catch (err) {
+        console.log("❌ Error vinculando barbero existente:", err.message);
+        return res.status(500).json({ error: "Error activando cuenta" });
       }
-      console.log("❌ Error creando usuario (fallback barbero_id):", insertError);
+    }
+
+    return res.json({ ok: true, usuario: withBarbero(existente, barberoValidado) });
+  }
+
+  if (barberoValidado?.usuario_id && barberoValidado.usuario_id !== user.id) {
+    console.log("⚠️ Barbero ya vinculado a otro usuario antes de crear usuario:", barbero_id);
+    return metadataError(res);
+  }
+
+  const { error: insertError } = await supabaseAdmin
+    .from("usuarios")
+    .insert(buildUsuarioPayload({ id: user.id, email: user.email, rol, barberia_id }));
+
+  if (insertError) {
+    console.log("❌ Error creando usuario:", insertError);
+    return res.status(500).json({ error: "Error creando usuario" });
+  }
+
+  if (rol === "barbero") {
+    try {
+      const vinculado = await vincularBarberoSeguro({ barbero: barberoValidado, userId: user.id });
+      if (!vinculado) {
+        console.log("⚠️ Barbero ya vinculado a otro usuario:", barbero_id);
+        return metadataError(res);
+      }
+    } catch (err) {
+      console.log("❌ Error vinculando barbero:", err.message);
+      return res.status(500).json({ error: "Error activando cuenta" });
     }
   }
 
-  // Caso 1: el barbero ya tiene usuario_id = user.id pero nunca se creó el registro en usuarios
-  const { data: barberoYaVinculado } = await supabaseAdmin
-    .from("barberos")
-    .select("id, nombre, barberia_id")
-    .eq("usuario_id", user.id)
-    .maybeSingle();
-
-  if (barberoYaVinculado) {
-    const { error: insertError } = await supabaseAdmin
-      .from("usuarios")
-      .insert(buildUsuarioPayload({ id: user.id, email: user.email, rol: "barbero", barberia_id: barberoYaVinculado.barberia_id }));
-    if (insertError) {
-      console.log("❌ Error creando usuario (fallback vinculado):", insertError);
-      return res.status(500).json({ error: "Error creando usuario" });
-    }
-    const { data: creado } = await supabaseAdmin.from("usuarios").select("*").eq("id", user.id).maybeSingle();
-    console.log("✅ Activación por barbero ya vinculado para", user.email, "→", barberoYaVinculado.nombre);
-    return res.json({ ok: true, usuario: withBarbero(creado, barberoYaVinculado) });
-  }
-
-  // Caso 2: buscar barbero sin vincular
-  const { data: barberoMatch } = await supabaseAdmin
-    .from("barberos")
-    .select("id, nombre, barberia_id")
-    .is("usuario_id", null)
-    .limit(50);
-
-  if (!barberoMatch || barberoMatch.length === 0) {
-    console.log("❌ No se encontraron barberos sin vincular para", user.email);
-    return res.status(400).json({ error: "No se pudo activar la cuenta. Pedile al admin que reenvíe la invitación." });
-  }
-
-  if (barberoMatch.length === 1) {
-    const b = barberoMatch[0];
-    const { error: insertError } = await supabaseAdmin
-      .from("usuarios")
-      .insert(buildUsuarioPayload({ id: user.id, email: user.email, rol: "barbero", barberia_id: b.barberia_id }));
-
-    if (insertError) {
-      console.log("❌ Error creando usuario (fallback único barbero):", insertError);
-      return res.status(500).json({ error: "Error creando usuario" });
-    }
-
-    await supabaseAdmin.from("barberos").update({ usuario_id: user.id }).eq("id", b.id);
-    const { data: creado } = await supabaseAdmin.from("usuarios").select("*").eq("id", user.id).maybeSingle();
-    console.log("✅ Activación por único barbero disponible para", user.email, "→", b.nombre);
-    return res.json({ ok: true, usuario: withBarbero(creado, b) });
-  }
-
-  console.log("❌ Metadata incompleta y hay múltiples barberos sin vincular para", user.email);
-  return res.status(400).json({ error: "No se pudo activar la cuenta automáticamente. Pedile al admin que reenvíe la invitación." });
+  const { data: creado } = await supabaseAdmin.from("usuarios").select("*").eq("id", user.id).maybeSingle();
+  console.log("✅ Activación por metadata validada para", user.email);
+  return res.json({ ok: true, usuario: withBarbero(creado, barberoValidado) });
 }
 
-module.exports = { adminLogin, barberoLogin, logout, activarCuenta };
+module.exports = {
+  adminLogin,
+  barberoLogin,
+  logout,
+  activarCuenta,
+  metadataMatchesBarbero,
+};

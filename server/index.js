@@ -23,6 +23,9 @@ const barberoRoutes = require("./routes/barbero.routes");
 const facturacionRoutes = require("./routes/facturacion.routes");
 const pagosRoutes = require("./routes/pagos.routes");
 const productosRoutes = require("./routes/productos.routes");
+const barberiaRoutes = require("./routes/barberia.routes");
+const serviciosRoutes = require("./routes/servicios.routes");
+const agendaAdminRoutes = require("./routes/agenda-admin.routes");
 const { initializeAllClients } = require("./services/wwebjs.manager");
 
 const app = express();
@@ -91,6 +94,9 @@ app.use("/barbero", barberoRoutes);
 app.use("/api/facturacion", facturacionRoutes);
 app.use("/api/pagos", pagosRoutes);
 app.use("/api/productos", productosRoutes);
+app.use("/api/barberia", barberiaRoutes);
+app.use("/api/servicios", serviciosRoutes);
+app.use("/api/agenda", agendaAdminRoutes);
 
 app.use((err, req, res, next) => {
   console.error("API ERROR:", err);
