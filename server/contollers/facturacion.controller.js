@@ -1,5 +1,5 @@
 const { supabaseAdmin } = require("../config/supabase");
-const { businessDate, businessDateRangeUtc, isDateString, monthStart } = require("../utils/business-time");
+const { businessDate, isDateString, monthStart } = require("../utils/business-time");
 
 function parseDate(value) {
   return isDateString(value) ? value : null;
@@ -46,18 +46,33 @@ async function getProductosPorTurnos(barberiaId, turnoIds = []) {
 }
 
 async function resumenDesdePagos(barberiaId, desde, hasta) {
-  const range = businessDateRangeUtc(desde, hasta);
-  const { data, error } = await supabaseAdmin
-    .from("pagos")
-    .select("id, monto, metodo, tipo, servicio, barbero, created_at")
+  const { data: turnos, error: turnosError } = await supabaseAdmin
+    .from("turnos")
+    .select("id, fecha, precio, estado, barbero, servicio")
     .eq("barberia_id", barberiaId)
-    .is("anulado_at", null)
-    .gte("created_at", range.start)
-    .lt("created_at", range.endExclusive)
-    .order("created_at", { ascending: true });
+    .gte("fecha", desde)
+    .lte("fecha", hasta)
+    .order("fecha", { ascending: true });
 
-  if (error) return { ok: false, error };
-  if (!data?.length) return { ok: true, data: null };
+  if (turnosError) return { ok: false, error: turnosError };
+  if (!turnos?.length) return { ok: true, data: null };
+
+  const turnoIds = turnos.map((turno) => turno.id).filter(Boolean);
+  const turnosPorId = new Map(turnos.map((turno) => [turno.id, turno]));
+  let data = [];
+
+  if (turnoIds.length) {
+    const { data: pagos, error } = await supabaseAdmin
+      .from("pagos")
+      .select("id, turno_id, monto, metodo, tipo, servicio, barbero, created_at")
+      .eq("barberia_id", barberiaId)
+      .is("anulado_at", null)
+      .in("turno_id", turnoIds)
+      .order("created_at", { ascending: true });
+
+    if (error) return { ok: false, error };
+    data = pagos || [];
+  }
 
   const porBarbero = new Map();
   const porServicio = new Map();
@@ -67,22 +82,46 @@ async function resumenDesdePagos(barberiaId, desde, hasta) {
   const porDia = new Map();
   let total = 0;
 
+  const turnosConPagos = new Set();
+
   for (const pago of data) {
+    const turno = turnosPorId.get(pago.turno_id);
+    if (!turno) continue;
+    turnosConPagos.add(pago.turno_id);
     const amount = asMoney(pago.monto);
     total += amount;
-    addToGroup(porBarbero, pago.barbero || "sin_barbero", pago.barbero || "Sin barbero", amount);
-    addToGroup(porServicio, pago.servicio || "sin_servicio", pago.servicio || "Sin servicio", amount);
+    addToGroup(porBarbero, pago.barbero || turno.barbero || "sin_barbero", pago.barbero || turno.barbero || "Sin barbero", amount);
+    addToGroup(porServicio, pago.servicio || turno.servicio || "sin_servicio", pago.servicio || turno.servicio || "Sin servicio", amount);
     addToGroup(porMetodo, pago.metodo || "otro", pago.metodo || "otro", amount);
     addToGroup(porTipo, pago.tipo || "pago_total", pago.tipo || "pago_total", amount);
-    const dia = businessDate(pago.created_at) || "sin_fecha";
-    addToGroup(porDia, dia, dia, amount);
+    addToGroup(porDia, turno.fecha || "sin_fecha", turno.fecha || "Sin fecha", amount);
   }
+
+  let legacyCount = 0;
+  const legacyTurnoIds = [];
+  for (const turno of turnos) {
+    if (turnosConPagos.has(turno.id)) continue;
+    if (turno.estado !== "completado") continue;
+    const amount = asMoney(turno.precio);
+    if (amount <= 0) continue;
+
+    legacyCount += 1;
+    legacyTurnoIds.push(turno.id);
+    total += amount;
+    addToGroup(porBarbero, turno.barbero || "sin_barbero", turno.barbero || "Sin barbero", amount);
+    addToGroup(porServicio, turno.servicio || "sin_servicio", turno.servicio || "Sin servicio", amount);
+    addToGroup(porTipo, "pago_historico", "Pago historico", amount);
+    addToGroup(porDia, turno.fecha || "sin_fecha", turno.fecha || "Sin fecha", amount);
+  }
+
+  if (!data.length && !legacyCount) return { ok: true, data: null };
 
   const barberos = sortedGroups(porBarbero);
   const servicios = sortedGroups(porServicio);
   let totalProductos = 0;
   try {
-    const productos = await getProductosPorTurnos(barberiaId, data.map((pago) => pago.turno_id));
+    const facturadosTurnoIds = [...new Set([...data.map((pago) => pago.turno_id), ...legacyTurnoIds])];
+    const productos = await getProductosPorTurnos(barberiaId, facturadosTurnoIds);
     for (const item of productos) {
       const amount = asMoney(item.subtotal);
       totalProductos += amount;
@@ -98,9 +137,10 @@ async function resumenDesdePagos(barberiaId, desde, hasta) {
       desde,
       hasta,
       total,
-      turnos_completados: data.length,
+      turnos_completados: turnos.filter((turno) => turno.estado === "completado").length,
       pagos_count: data.length,
-      ticket_promedio: data.length ? total / data.length : 0,
+      pagos_historicos_count: legacyCount,
+      ticket_promedio: (data.length + legacyCount) ? total / (data.length + legacyCount) : 0,
       total_productos: totalProductos,
       mejor_barbero: barberos[0] || null,
       mejor_servicio: servicios[0] || null,
