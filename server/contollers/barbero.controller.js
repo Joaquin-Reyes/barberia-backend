@@ -1,4 +1,5 @@
 const { supabaseAdmin } = require("../config/supabase");
+const { isMissingColumnError, withoutField } = require("../utils/supabase-compat");
 
 const APP_TIME_ZONE = "America/Argentina/Buenos_Aires";
 const RANGOS_TURNOS = new Set(["hoy", "manana", "semana"]);
@@ -60,7 +61,7 @@ async function getTurnosBarbero(req, res) {
 
     const { desde, hasta } = rangoFechas(rango);
 
-    const { data: turnos, error: turnosError } = await supabaseAdmin
+    let { data: turnos, error: turnosError } = await supabaseAdmin
       .from("turnos")
       .select("id, fecha, hora, nombre, servicio, estado")
       .eq("barberia_id", barberia_id)
@@ -69,6 +70,19 @@ async function getTurnosBarbero(req, res) {
       .lte("fecha", hasta)
       .order("fecha", { ascending: true })
       .order("hora", { ascending: true });
+
+    if (isMissingColumnError(turnosError, "barbero_id")) {
+      console.log("⚠️ turnos.barbero_id no existe en DB; listando turnos por nombre de barbero");
+      ({ data: turnos, error: turnosError } = await supabaseAdmin
+        .from("turnos")
+        .select("id, fecha, hora, nombre, servicio, estado")
+        .eq("barberia_id", barberia_id)
+        .eq("barbero", barbero.nombre)
+        .gte("fecha", desde)
+        .lte("fecha", hasta)
+        .order("fecha", { ascending: true })
+        .order("hora", { ascending: true }));
+    }
 
     if (turnosError) {
       console.error("❌ Error obteniendo turnos:", turnosError);
@@ -113,7 +127,7 @@ async function registrarAtencionCola(req, res) {
     const hoy = fechaLocal(0);
     const hora = horaLocal();
 
-    const { error } = await supabaseAdmin.from("turnos").insert({
+    const turnoInsert = {
       nombre: nombre_cliente,
       telefono: "",
       servicio: servicio || "Sin especificar",
@@ -126,7 +140,16 @@ async function registrarAtencionCola(req, res) {
       estado: "completado",
       recordatorio_24h: false,
       recordatorio_3h: false,
-    });
+    };
+
+    let { error } = await supabaseAdmin.from("turnos").insert(turnoInsert);
+
+    if (isMissingColumnError(error, "barbero_id")) {
+      console.log("⚠️ turnos.barbero_id no existe en DB; reintentando atención sin barbero_id");
+      ({ error } = await supabaseAdmin
+        .from("turnos")
+        .insert(withoutField(turnoInsert, "barbero_id")));
+    }
 
     if (error) {
       console.error("❌ Error registrando atención de cola:", error);

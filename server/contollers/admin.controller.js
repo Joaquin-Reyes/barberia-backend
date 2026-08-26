@@ -2,6 +2,7 @@ const { supabaseAdmin } = require("../config/supabase");
 const { metadataMatchesBarbero } = require("./auth.controller");
 const { notificarBarbero, enviarTemplateConfirmacion } = require("../services/whatsapp.service");
 const { formatearHora, obtenerHorariosDisponibles } = require("../services/agenda.service");
+const { isMissingColumnError, withoutField } = require("../utils/supabase-compat");
 const wwebjsManager = require("../services/wwebjs.manager");
 
 const ESTADOS_TURNO = ["pendiente", "confirmado", "completado", "cancelado"];
@@ -76,7 +77,7 @@ async function crearTurno(req, res) {
       return res.status(400).json({ error: "Horario ocupado" });
     }
 
-    const { error: errorInsert } = await supabaseAdmin.from("turnos").insert([{
+    const turnoInsert = {
       nombre,
       telefono,
       servicio,
@@ -88,7 +89,16 @@ async function crearTurno(req, res) {
       barberia_id,
       recordatorio_24h: false,
       recordatorio_3h: false
-    }]);
+    };
+
+    let { error: errorInsert } = await supabaseAdmin.from("turnos").insert([turnoInsert]);
+
+    if (isMissingColumnError(errorInsert, "barbero_id")) {
+      console.log("⚠️ turnos.barbero_id no existe en DB; reintentando alta sin barbero_id");
+      ({ error: errorInsert } = await supabaseAdmin
+        .from("turnos")
+        .insert([withoutField(turnoInsert, "barbero_id")]));
+    }
 
     if (errorInsert) {
       console.log("❌ Error creando turno:", errorInsert);
@@ -294,11 +304,20 @@ async function actualizarEstadoTurno(req, res) {
     cambios.recordatorio_3h = false;
   }
 
-  const { error } = await supabaseAdmin
+  let { error } = await supabaseAdmin
     .from("turnos")
     .update(cambios)
     .eq("id", id)
     .eq("barberia_id", barberia_id);
+
+  if (isMissingColumnError(error, "barbero_id") && Object.prototype.hasOwnProperty.call(cambios, "barbero_id")) {
+    console.log("⚠️ turnos.barbero_id no existe en DB; reintentando update sin barbero_id");
+    ({ error } = await supabaseAdmin
+      .from("turnos")
+      .update(withoutField(cambios, "barbero_id"))
+      .eq("id", id)
+      .eq("barberia_id", barberia_id));
+  }
 
   if (error) return res.status(500).json({ error });
   res.json({ ok: true });
