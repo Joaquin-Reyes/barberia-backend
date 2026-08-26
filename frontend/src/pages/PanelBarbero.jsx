@@ -2,6 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase, getAuthToken } from "../lib/supabase";
 
 const API = "https://barberia-backend-production-7dae.up.railway.app";
+const RANGOS_TURNOS = [
+  { id: "hoy", label: "Hoy" },
+  { id: "manana", label: "Mañana" },
+  { id: "semana", label: "Semana" },
+];
 
 function formatHora(str) {
   if (!str) return "";
@@ -11,11 +16,29 @@ function formatHora(str) {
   return str.slice(0, 5);
 }
 
+function formatFecha(str) {
+  if (!str) return "";
+  const [year, month, day] = str.split("-").map(Number);
+  if (!year || !month || !day) return str;
+  return new Date(year, month - 1, day).toLocaleDateString("es-AR", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+  });
+}
+
+async function parseApiError(res, fallback) {
+  const body = await res.json().catch(() => ({}));
+  return body.error || fallback;
+}
+
 export default function PanelBarbero({ user }) {
   const [barberoId, setBarberoId] = useState(null);
   const [proximoCliente, setProximoCliente] = useState(null);
-  const [turnosHoy, setTurnosHoy] = useState([]);
+  const [turnos, setTurnos] = useState([]);
+  const [rangoTurnos, setRangoTurnos] = useState("hoy");
   const [cargando, setCargando] = useState(true);
+  const [cargandoTurnos, setCargandoTurnos] = useState(false);
   const [terminando, setTerminando] = useState(false);
   const [toast, setToast] = useState(null);
   const [modalCola, setModalCola] = useState(null); // { nombre_cliente } | null
@@ -29,31 +52,62 @@ export default function PanelBarbero({ user }) {
 
   const cargarDatos = useCallback(async () => {
     const token = await getAuthToken();
+    if (!token) {
+      mostrarToast("Sesión expirada. Volvé a ingresar.", "error");
+      setCargando(false);
+      return;
+    }
+
+    setCargandoTurnos(true);
     try {
-      const [colaRes, turnosRes] = await Promise.all([
+      const requests = [
         fetch(`${API}/cola/${user.barberia_id}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch(`${API}/barbero/turnos`, {
+        fetch(`${API}/barbero/turnos?rango=${rangoTurnos}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-      ]);
+      ];
+
+      if (rangoTurnos !== "hoy") {
+        requests.push(fetch(`${API}/barbero/turnos?rango=hoy`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }));
+      }
+
+      const [colaRes, turnosRes, turnosHoyRes] = await Promise.all(requests);
 
       let bId = null;
-      let turnos = [];
+      let turnosListado = [];
+      let turnosHoy = [];
       if (turnosRes.ok) {
         const data = await turnosRes.json();
-        turnos = data.turnos || [];
-        setTurnosHoy(turnos);
+        turnosListado = data.turnos || [];
+        setTurnos(turnosListado);
         if (data.barbero_id) {
           setBarberoId(data.barbero_id);
           bId = data.barbero_id;
         }
+      } else {
+        throw new Error(await parseApiError(turnosRes, "Error al cargar turnos"));
+      }
+
+      if (rangoTurnos === "hoy") {
+        turnosHoy = turnosListado;
+      } else if (turnosHoyRes?.ok) {
+        const dataHoy = await turnosHoyRes.json();
+        turnosHoy = dataHoy.turnos || [];
+        if (!bId && dataHoy.barbero_id) {
+          setBarberoId(dataHoy.barbero_id);
+          bId = dataHoy.barbero_id;
+        }
+      } else if (turnosHoyRes) {
+        throw new Error(await parseApiError(turnosHoyRes, "Error al cargar turnos de hoy"));
       }
 
       // Prioridad 1: turno pendiente cuya hora ya llegó
       const ahora = new Date();
-      const turnoDue = turnos
+      const turnoDue = turnosHoy
         .filter((t) => t.estado === "pendiente" && t.hora)
         .filter((t) => {
           const [h, m] = t.hora.slice(0, 5).split(":").map(Number);
@@ -85,16 +139,19 @@ export default function PanelBarbero({ user }) {
           });
           return;
         }
+      } else {
+        throw new Error(await parseApiError(colaRes, "Error al cargar cola"));
       }
 
       setProximoCliente(null);
     } catch (err) {
       console.error(err);
-      mostrarToast("Error al cargar datos", "error");
+      mostrarToast(err.message || "Error al cargar datos", "error");
     } finally {
       setCargando(false);
+      setCargandoTurnos(false);
     }
-  }, [mostrarToast, user?.barberia_id]);
+  }, [mostrarToast, rangoTurnos, user?.barberia_id]);
 
   useEffect(() => {
     if (!user?.barberia_id) return;
@@ -144,7 +201,7 @@ export default function PanelBarbero({ user }) {
     try {
       // Si es turno reservado, marcarlo como completado
       if (proximoCliente?.tipo === "turno_reservado" && proximoCliente.turno_id) {
-        await fetch(`${API}/admin/turnos/${proximoCliente.turno_id}`, {
+        const res = await fetch(`${API}/admin/turnos/${proximoCliente.turno_id}`, {
           method: "PUT",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -152,16 +209,19 @@ export default function PanelBarbero({ user }) {
           },
           body: JSON.stringify({ estado: "completado" }),
         });
-        setTurnosHoy((prev) =>
+        if (!res.ok) throw new Error(await parseApiError(res, "Error completando turno"));
+        setTurnos((prev) =>
           prev.map((t) =>
             t.id === proximoCliente.turno_id ? { ...t, estado: "completado" } : t
           )
         );
+        mostrarToast("Turno completado");
+        return;
       }
 
       // Si es cola de espera y se proporcionaron datos, registrar en turnos
       if (proximoCliente?.tipo === "cola_espera" && datosServicio) {
-        await fetch(`${API}/barbero/registrar-atencion`, {
+        const res = await fetch(`${API}/barbero/registrar-atencion`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -173,15 +233,17 @@ export default function PanelBarbero({ user }) {
             precio: datosServicio.precio,
           }),
         });
+        if (!res.ok) throw new Error(await parseApiError(res, "Error registrando atención"));
       }
 
       const res = await fetch(`${API}/cola/terminar/${barberoId}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error();
-    } catch {
-      mostrarToast("Error al procesar", "error");
+      if (!res.ok) throw new Error(await parseApiError(res, "Error terminando atención"));
+      mostrarToast("Atención terminada");
+    } catch (err) {
+      mostrarToast(err.message || "Error al procesar", "error");
     } finally {
       setTerminando(false);
       await cargarDatos();
@@ -189,13 +251,27 @@ export default function PanelBarbero({ user }) {
   }
 
   async function confirmarModalCola(registrar) {
-    setModalCola(null);
     if (registrar) {
-      await ejecutarTerminar({ servicio: servicioCola, precio: precioCola });
+      const servicio = servicioCola.trim();
+      const precio = Number(precioCola);
+      if (!servicio) {
+        mostrarToast("Ingresá el servicio realizado", "error");
+        return;
+      }
+      if (precioCola !== "" && (!Number.isFinite(precio) || precio < 0)) {
+        mostrarToast("Ingresá un precio válido", "error");
+        return;
+      }
+      setModalCola(null);
+      await ejecutarTerminar({ servicio, precio: precioCola });
     } else {
+      setModalCola(null);
       await ejecutarTerminar(null);
     }
   }
+
+  const tituloTurnos = RANGOS_TURNOS.find((r) => r.id === rangoTurnos)?.label || "Hoy";
+  const puedeTerminar = Boolean(barberoId && proximoCliente);
 
   function renderCardInfo() {
     if (!proximoCliente || proximoCliente.tipo === "sin_clientes") {
@@ -292,6 +368,14 @@ export default function PanelBarbero({ user }) {
               >
                 Solo terminar
               </button>
+              <button
+                onClick={() => setModalCola(null)}
+                disabled={terminando}
+                type="button"
+                style={{ flex: "0 0 auto", background: "#ffffff", color: "#475569", border: "1px solid #cbd5e1", padding: "11px 12px" }}
+              >
+                Cancelar
+              </button>
             </div>
           </div>
         </div>
@@ -320,44 +404,56 @@ export default function PanelBarbero({ user }) {
             {renderCardInfo()}
             <button
               onClick={terminar}
-              disabled={terminando || !barberoId}
-              style={{ background: "#16a34a", padding: "12px 24px", fontSize: 14, width: "100%" }}
+              disabled={terminando || !puedeTerminar}
+              style={{ background: "#16a34a", padding: "12px 24px", fontSize: 14, width: "100%", opacity: puedeTerminar ? 1 : 0.55, cursor: puedeTerminar ? "pointer" : "not-allowed" }}
             >
               {terminando ? "Procesando..." : "Terminé"}
             </button>
           </div>
 
-          {/* TURNOS DEL DÍA */}
+          {/* TURNOS */}
           <div className="card">
-            <h2 style={{ marginBottom: 16 }}>Turnos de hoy</h2>
-            {turnosHoy.length === 0 ? (
+            <div className="barber-turnos-head">
+              <div>
+                <h2 style={{ margin: 0 }}>Turnos</h2>
+                <p>{tituloTurnos}</p>
+              </div>
+              <div className="barber-range-tabs" role="tablist" aria-label="Rango de turnos">
+                {RANGOS_TURNOS.map((rango) => (
+                  <button
+                    key={rango.id}
+                    type="button"
+                    onClick={() => setRangoTurnos(rango.id)}
+                    className={rangoTurnos === rango.id ? "active" : ""}
+                    aria-pressed={rangoTurnos === rango.id}
+                  >
+                    {rango.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {cargandoTurnos ? (
+              <p style={{ fontSize: 13, color: "#9ca3af" }}>Actualizando turnos...</p>
+            ) : turnos.length === 0 ? (
               <p style={{ fontSize: 13, color: "#9ca3af" }}>
-                No tenés turnos reservados para hoy.
+                No tenés turnos reservados en este rango.
               </p>
             ) : (
-              <div className="table-container">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Hora</th>
-                      <th>Cliente</th>
-                      <th>Servicio</th>
-                      <th>Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {turnosHoy.map((t) => (
-                      <tr key={t.id}>
-                        <td style={{ fontWeight: 600 }}>{formatHora(t.hora)}</td>
-                        <td>{t.nombre}</td>
-                        <td style={{ fontSize: 13, color: "#6b7280" }}>{t.servicio}</td>
-                        <td>
-                          <span className={`estado ${t.estado}`}>{t.estado}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="barber-turnos-list">
+                {turnos.map((t) => (
+                  <div className="barber-turno-card" key={t.id}>
+                    <div>
+                      <strong>{t.nombre}</strong>
+                      <span>{t.servicio || "Sin servicio"}</span>
+                    </div>
+                    <div className="barber-turno-meta">
+                      <span>{formatFecha(t.fecha)}</span>
+                      <strong>{formatHora(t.hora)}</strong>
+                      <span className={`estado ${t.estado}`}>{t.estado}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

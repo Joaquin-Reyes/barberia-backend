@@ -1,8 +1,49 @@
 const { supabaseAdmin } = require("../config/supabase");
 
+const APP_TIME_ZONE = "America/Argentina/Buenos_Aires";
+const RANGOS_TURNOS = new Set(["hoy", "manana", "semana"]);
+
+function fechaLocal(offsetDias = 0) {
+  const partes = new Intl.DateTimeFormat("en-US", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+
+  const valores = Object.fromEntries(partes.map((parte) => [parte.type, parte.value]));
+  const baseUtc = new Date(Date.UTC(Number(valores.year), Number(valores.month) - 1, Number(valores.day)));
+  baseUtc.setUTCDate(baseUtc.getUTCDate() + offsetDias);
+  return baseUtc.toISOString().slice(0, 10);
+}
+
+function horaLocal() {
+  return new Intl.DateTimeFormat("es-AR", {
+    timeZone: APP_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date());
+}
+
+function rangoFechas(rango = "hoy") {
+  if (rango === "manana") {
+    const manana = fechaLocal(1);
+    return { desde: manana, hasta: manana };
+  }
+
+  if (rango === "semana") {
+    return { desde: fechaLocal(0), hasta: fechaLocal(6) };
+  }
+
+  const hoy = fechaLocal(0);
+  return { desde: hoy, hasta: hoy };
+}
+
 async function getTurnosBarbero(req, res) {
   const usuario_id = req.user.id;
   const barberia_id = req.user.barberia_id;
+  const rango = RANGOS_TURNOS.has(req.query.rango) ? req.query.rango : "hoy";
 
   try {
     // 1. Buscar el registro de barbero vinculado al usuario logueado
@@ -17,15 +58,16 @@ async function getTurnosBarbero(req, res) {
       return res.status(404).json({ error: "Barbero no encontrado para este usuario" });
     }
 
-    // 2. Turnos de hoy filtrados por nombre del barbero
-    const hoy = new Date().toISOString().split("T")[0];
+    const { desde, hasta } = rangoFechas(rango);
 
     const { data: turnos, error: turnosError } = await supabaseAdmin
       .from("turnos")
-      .select("id, hora, nombre, servicio, estado")
-      .eq("barbero", barbero.nombre)
-      .eq("fecha", hoy)
+      .select("id, fecha, hora, nombre, servicio, estado")
       .eq("barberia_id", barberia_id)
+      .or(`barbero_id.eq.${barbero.id},barbero.eq.${barbero.nombre}`)
+      .gte("fecha", desde)
+      .lte("fecha", hasta)
+      .order("fecha", { ascending: true })
       .order("hora", { ascending: true });
 
     if (turnosError) {
@@ -36,6 +78,9 @@ async function getTurnosBarbero(req, res) {
     res.json({
       barbero_id: barbero.id,
       nombre: barbero.nombre,
+      rango,
+      desde,
+      hasta,
       turnos: turnos || [],
     });
   } catch (err) {
@@ -65,8 +110,8 @@ async function registrarAtencionCola(req, res) {
       return res.status(404).json({ error: "Barbero no encontrado" });
     }
 
-    const hoy = new Date().toISOString().split("T")[0];
-    const hora = new Date().toTimeString().slice(0, 5);
+    const hoy = fechaLocal(0);
+    const hora = horaLocal();
 
     const { error } = await supabaseAdmin.from("turnos").insert({
       nombre: nombre_cliente,
@@ -74,6 +119,7 @@ async function registrarAtencionCola(req, res) {
       servicio: servicio || "Sin especificar",
       precio: Number(precio) || 0,
       barbero: barbero.nombre,
+      barbero_id: barbero.id,
       fecha: hoy,
       hora,
       barberia_id,

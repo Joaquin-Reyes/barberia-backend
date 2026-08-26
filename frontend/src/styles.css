@@ -574,6 +574,106 @@ tr:hover td {
 }
 
 /* ========================= */
+/* PANEL BARBERO             */
+/* ========================= */
+
+.barber-turnos-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.barber-turnos-head p {
+  margin: 3px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.barber-range-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #F8FAFC;
+}
+
+.barber-range-tabs button {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  box-shadow: none;
+  white-space: nowrap;
+}
+
+.barber-range-tabs button:hover {
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.barber-range-tabs button.active {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.barber-turnos-list {
+  display: grid;
+  gap: 8px;
+}
+
+.barber-turno-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.barber-turno-card strong,
+.barber-turno-card span {
+  display: block;
+}
+
+.barber-turno-card > div:first-child {
+  min-width: 0;
+}
+
+.barber-turno-card > div:first-child strong {
+  color: var(--text);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.barber-turno-card > div:first-child span {
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.barber-turno-meta {
+  display: grid;
+  grid-template-columns: auto auto auto;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.barber-turno-meta strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+/* ========================= */
 /* EXCEPCIONES FORM          */
 /* ========================= */
 
@@ -624,6 +724,25 @@ tr:hover td {
   }
   .page-content {
     padding: 16px;
+  }
+  .barber-turnos-head {
+    align-items: flex-start;
+    display: grid;
+  }
+  .barber-range-tabs {
+    width: 100%;
+    overflow-x: auto;
+  }
+  .barber-range-tabs button {
+    flex: 1 0 auto;
+  }
+  .barber-turno-card,
+  .barber-turno-meta {
+    grid-template-columns: 1fr;
+  }
+  .barber-turno-meta {
+    gap: 5px;
+    white-space: normal;
   }
 }
 

@@ -20,12 +20,6 @@ const {
   crearTurnoDesdeSolicitudWhatsapp
 } = require("../contollers/admin.controller");
 
-// 🔐 Proteger panel barbero (antes de la protección general)
-router.use("/barbero.html", (req, res, next) => {
-  if (req.session.barbero) return next();
-  return res.sendFile(path.join(__dirname, "../admin/login-barbero.html"));
-});
-
 // API routes con su propio auth (antes de la protección HTML general)
 router.post("/crear-turno", authMiddleware, crearTurno);
 router.post("/barberos", authMiddleware, crearBarbero);
@@ -45,7 +39,6 @@ router.use("/", (req, res, next) => {
   if (req.path.startsWith("/crear-turno")) return next();
   if (req.path.startsWith("/turnos")) return next();
   if (req.path.startsWith("/solicitudes-whatsapp")) return next();
-  if (req.path === "/barbero.html") return next();
   if (req.session.auth) return next();
   return res.sendFile(path.join(__dirname, "../admin/login.html"));
 });

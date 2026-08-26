@@ -8,6 +8,7 @@ process.env.SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE || "test-s
 
 const { supabaseAdmin } = require("../config/supabase");
 const colaController = require("../contollers/cola.controller");
+const barberoController = require("../contollers/barbero.controller");
 const colaService = require("../services/cola.service");
 const agendaService = require("../services/agenda.service");
 
@@ -18,6 +19,19 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function fechaArgentina(offsetDias = 0) {
+  const partes = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const valores = Object.fromEntries(partes.map((parte) => [parte.type, parte.value]));
+  const baseUtc = new Date(Date.UTC(Number(valores.year), Number(valores.month) - 1, Number(valores.day)));
+  baseUtc.setUTCDate(baseUtc.getUTCDate() + offsetDias);
+  return baseUtc.toISOString().slice(0, 10);
+}
+
 function createSupabaseMock(seed, options = {}) {
   const db = clone(seed);
   const calls = [];
@@ -25,9 +39,19 @@ function createSupabaseMock(seed, options = {}) {
 
   function applyFilters(rows, filters) {
     return rows.filter((row) => filters.every((filter) => {
+      if (filter.type === "or") {
+        return filter.conditions.some((condition) => {
+          const value = row[condition.column];
+          if (condition.operator === "eq") return String(value || "") === String(condition.value || "");
+          return false;
+        });
+      }
+
       const value = row[filter.column];
       if (filter.type === "eq") return value === filter.value;
       if (filter.type === "ilike") return String(value || "").toLowerCase() === String(filter.value || "").toLowerCase();
+      if (filter.type === "gte") return String(value || "") >= String(filter.value || "");
+      if (filter.type === "lte") return String(value || "") <= String(filter.value || "");
       return true;
     }));
   }
@@ -97,6 +121,25 @@ function createSupabaseMock(seed, options = {}) {
       },
       ilike(column, value) {
         state.filters.push({ type: "ilike", column, value });
+        return builder;
+      },
+      gte(column, value) {
+        state.filters.push({ type: "gte", column, value });
+        return builder;
+      },
+      lte(column, value) {
+        state.filters.push({ type: "lte", column, value });
+        return builder;
+      },
+      or(expression) {
+        const conditions = String(expression || "")
+          .split(",")
+          .map((part) => {
+            const [column, operator, ...valueParts] = part.split(".");
+            return { column, operator, value: valueParts.join(".") };
+          })
+          .filter((condition) => condition.column && condition.operator);
+        state.filters.push({ type: "or", conditions });
         return builder;
       },
       order(column) {
@@ -252,6 +295,28 @@ test("turnoDisponible distingue barberias con mismo barbero, fecha y hora", asyn
 
   assert.equal(disponibleA, true);
   assert.equal(disponibleB, false);
+});
+
+test("barbero consulta sus turnos por rango semanal", async () => {
+  createSupabaseMock({
+    barberos: [{ id: "barbero-a", usuario_id: "user-a", barberia_id: "barberia-a", nombre: "Juan" }],
+    turnos: [
+      { id: "turno-hoy", barberia_id: "barberia-a", barbero: "Juan", fecha: fechaArgentina(0), hora: "10:00", nombre: "Ana", servicio: "Corte", estado: "pendiente" },
+      { id: "turno-semana", barberia_id: "barberia-a", barbero: "Juan", fecha: fechaArgentina(6), hora: "11:00", nombre: "Luis", servicio: "Barba", estado: "pendiente" },
+      { id: "turno-fuera", barberia_id: "barberia-a", barbero: "Juan", fecha: fechaArgentina(7), hora: "12:00", nombre: "Marta", servicio: "Corte", estado: "pendiente" },
+      { id: "turno-otro", barberia_id: "barberia-a", barbero: "Pedro", fecha: fechaArgentina(1), hora: "13:00", nombre: "Otro", servicio: "Corte", estado: "pendiente" },
+    ],
+  });
+  const res = createRes();
+
+  await barberoController.getTurnosBarbero(
+    req({ id: "user-a", rol: "barbero", barberia_id: "barberia-a" }, { query: { rango: "semana" } }),
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.rango, "semana");
+  assert.deepEqual(res.body.turnos.map((turno) => turno.id), ["turno-hoy", "turno-semana"]);
 });
 
 test("eliminarTurno no elimina turno de otro tenant", async () => {

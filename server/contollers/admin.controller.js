@@ -6,7 +6,7 @@ const wwebjsManager = require("../services/wwebjs.manager");
 
 const ESTADOS_TURNO = ["pendiente", "confirmado", "completado", "cancelado"];
 const CAMPOS_TURNO_ADMIN = ["nombre", "telefono", "servicio", "precio", "barbero", "fecha", "hora", "estado"];
-const CAMPOS_PROHIBIDOS_TURNO = ["id", "barberia_id", "created_at", "updated_at", "usuario_id"];
+const CAMPOS_PROHIBIDOS_TURNO = ["id", "barberia_id", "barbero_id", "created_at", "updated_at", "usuario_id"];
 
 function isWhatsappDirectChatId(chatId) {
   if (!chatId) return false;
@@ -38,6 +38,27 @@ async function crearTurno(req, res) {
   }
 
   try {
+    let barberoValidado = null;
+    if (barbero) {
+      const { data: barberoExiste, error: errorBarberoExiste } = await supabaseAdmin
+        .from("barberos")
+        .select("id")
+        .ilike("nombre", barbero)
+        .eq("barberia_id", barberia_id)
+        .maybeSingle();
+
+      if (errorBarberoExiste) {
+        console.log("❌ Error validando barbero:", errorBarberoExiste);
+        return res.status(500).json({ error: "Error validando barbero" });
+      }
+
+      if (!barberoExiste) {
+        return res.status(400).json({ error: "Barbero no encontrado" });
+      }
+
+      barberoValidado = barberoExiste;
+    }
+
     const { data: turnosExistentes, error: errorBusqueda } = await supabaseAdmin
       .from("turnos")
       .select("*")
@@ -55,30 +76,13 @@ async function crearTurno(req, res) {
       return res.status(400).json({ error: "Horario ocupado" });
     }
 
-    if (barbero) {
-      const { data: barberoExiste, error: errorBarberoExiste } = await supabaseAdmin
-        .from("barberos")
-        .select("id")
-        .ilike("nombre", barbero)
-        .eq("barberia_id", barberia_id)
-        .maybeSingle();
-
-      if (errorBarberoExiste) {
-        console.log("❌ Error validando barbero:", errorBarberoExiste);
-        return res.status(500).json({ error: "Error validando barbero" });
-      }
-
-      if (!barberoExiste) {
-        return res.status(400).json({ error: "Barbero no encontrado" });
-      }
-    }
-
     const { error: errorInsert } = await supabaseAdmin.from("turnos").insert([{
       nombre,
       telefono,
       servicio,
       precio: precio || 0,
       barbero,
+      barbero_id: barberoValidado?.id || null,
       fecha,
       hora: horaNormalizada,
       barberia_id,
@@ -257,6 +261,9 @@ async function actualizarEstadoTurno(req, res) {
 
     if (errorBarberoExiste) return res.status(500).json({ error: "Error validando barbero" });
     if (!barberoExiste) return res.status(400).json({ error: "Barbero no encontrado" });
+    cambios.barbero_id = barberoExiste.id;
+  } else if (Object.prototype.hasOwnProperty.call(cambios, "barbero")) {
+    cambios.barbero_id = null;
   }
 
   const fechaFinal = cambios.fecha || turnoActual.fecha;
