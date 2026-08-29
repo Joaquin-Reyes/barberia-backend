@@ -254,12 +254,6 @@ function PagosPanel({ turno, onChanged, onToast }) {
         </div>
       </div>
 
-      {data?.pago_historico && (
-        <div className="turno-pagos-warning">
-          Turno completado histórico: figura saldado aunque no tenga un pago cargado en caja.
-        </div>
-      )}
-
       {data && totalCobrable <= 0 && (
         <div className="turno-pagos-warning">
           Este turno no tiene servicio o precio cargado. Editalo para completar esos datos o ingresá el monto manualmente.
