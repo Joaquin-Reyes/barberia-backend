@@ -1,5 +1,6 @@
 const { supabaseAdmin } = require("../config/supabase");
 const { isMissingColumnError, withoutField } = require("../utils/supabase-compat");
+const { registrarPagoTurno } = require("../services/pagos.service");
 
 const APP_TIME_ZONE = "America/Argentina/Buenos_Aires";
 const RANGOS_TURNOS = new Set(["hoy", "manana", "semana"]);
@@ -106,7 +107,7 @@ async function getTurnosBarbero(req, res) {
 async function registrarAtencionCola(req, res) {
   const usuario_id = req.user.id;
   const barberia_id = req.user.barberia_id;
-  const { nombre_cliente, servicio, precio } = req.body;
+  const { nombre_cliente, servicio, precio, metodo_pago = "efectivo" } = req.body;
 
   if (!nombre_cliente) {
     return res.status(400).json({ error: "Falta nombre_cliente" });
@@ -142,13 +143,19 @@ async function registrarAtencionCola(req, res) {
       recordatorio_3h: false,
     };
 
-    let { error } = await supabaseAdmin.from("turnos").insert(turnoInsert);
+    let { data: turnoCreado, error } = await supabaseAdmin
+      .from("turnos")
+      .insert(turnoInsert)
+      .select()
+      .single();
 
     if (isMissingColumnError(error, "barbero_id")) {
       console.log("⚠️ turnos.barbero_id no existe en DB; reintentando atención sin barbero_id");
-      ({ error } = await supabaseAdmin
+      ({ data: turnoCreado, error } = await supabaseAdmin
         .from("turnos")
-        .insert(withoutField(turnoInsert, "barbero_id")));
+        .insert(withoutField(turnoInsert, "barbero_id"))
+        .select()
+        .single());
     }
 
     if (error) {
@@ -156,7 +163,16 @@ async function registrarAtencionCola(req, res) {
       return res.status(500).json({ error: "Error guardando" });
     }
 
-    res.json({ ok: true });
+    const pagoResult = await registrarPagoTurno({
+      barberia_id,
+      turno: turnoCreado,
+      monto: turnoCreado.precio,
+      metodo: metodo_pago,
+      creado_por: req.user.id,
+    });
+
+    if (pagoResult.error) return res.status(pagoResult.status || 500).json({ error: pagoResult.error });
+    res.json({ ok: true, turno: turnoCreado, pago_creado: Boolean(pagoResult.created) });
   } catch (err) {
     console.error("❌ Error en registrarAtencionCola:", err);
     res.status(500).json({ error: "Error interno" });

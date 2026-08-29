@@ -7,6 +7,13 @@ const RANGOS_TURNOS = [
   { id: "manana", label: "Mañana" },
   { id: "semana", label: "Semana" },
 ];
+const METODOS_PAGO = [
+  ["efectivo", "Efectivo"],
+  ["transferencia", "Transferencia"],
+  ["mercado_pago", "Mercado Pago"],
+  ["tarjeta", "Tarjeta"],
+  ["otro", "Otro"],
+];
 
 function formatHora(str) {
   if (!str) return "";
@@ -44,6 +51,7 @@ export default function PanelBarbero({ user }) {
   const [modalCola, setModalCola] = useState(null); // { nombre_cliente } | null
   const [servicioCola, setServicioCola] = useState("");
   const [precioCola, setPrecioCola] = useState("");
+  const [metodoPago, setMetodoPago] = useState("efectivo");
 
   const mostrarToast = useCallback((mensaje, tipo = "success") => {
     setToast({ mensaje, tipo });
@@ -188,12 +196,10 @@ export default function PanelBarbero({ user }) {
 
   function terminar() {
     if (!barberoId || !proximoCliente) return;
-    if (
-      proximoCliente.tipo === "cola_espera" ||
-      (proximoCliente.tipo === "turno_reservado" && (!String(proximoCliente.servicio || "").trim() || !Number(proximoCliente.precio)))
-    ) {
+    if (proximoCliente.tipo === "cola_espera" || proximoCliente.tipo === "turno_reservado") {
       setServicioCola(proximoCliente.servicio || "");
       setPrecioCola(proximoCliente.precio ? String(proximoCliente.precio) : "");
+      setMetodoPago("efectivo");
       setModalCola({ nombre_cliente: proximoCliente.nombre_cliente });
     } else {
       ejecutarTerminar(null);
@@ -210,6 +216,7 @@ export default function PanelBarbero({ user }) {
         if (datosServicio) {
           body.servicio = datosServicio.servicio;
           body.precio = datosServicio.precio;
+          body.metodo_pago = datosServicio.metodo_pago;
         }
 
         const res = await fetch(`${API}/admin/turnos/${proximoCliente.turno_id}`, {
@@ -242,6 +249,7 @@ export default function PanelBarbero({ user }) {
             nombre_cliente: proximoCliente.nombre_cliente,
             servicio: datosServicio.servicio,
             precio: datosServicio.precio,
+            metodo_pago: datosServicio.metodo_pago,
           }),
         });
         if (!res.ok) throw new Error(await parseApiError(res, "Error registrando atención"));
@@ -257,7 +265,7 @@ export default function PanelBarbero({ user }) {
       mostrarToast(err.message || "Error al procesar", "error");
     } finally {
       setTerminando(false);
-      await cargarDatos();
+      cargarDatos();
     }
   }
 
@@ -274,7 +282,7 @@ export default function PanelBarbero({ user }) {
         return;
       }
       setModalCola(null);
-      await ejecutarTerminar({ servicio, precio: precioCola });
+      await ejecutarTerminar({ servicio, precio: precioCola, metodo_pago: metodoPago });
     } else {
       setModalCola(null);
       await ejecutarTerminar(null);
@@ -364,20 +372,33 @@ export default function PanelBarbero({ user }) {
               style={{ width: "100%", marginBottom: 20, boxSizing: "border-box" }}
             />
 
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 4 }}>
+              Método de pago
+            </label>
+            <select
+              value={metodoPago}
+              onChange={e => setMetodoPago(e.target.value)}
+              style={{ width: "100%", marginBottom: 20, boxSizing: "border-box" }}
+            >
+              {METODOS_PAGO.map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 onClick={() => confirmarModalCola(true)}
                 disabled={terminando}
                 style={{ flex: 1, background: "#16a34a", padding: "11px 0" }}
               >
-                {terminando ? "Guardando..." : "Registrar y terminar"}
+                {terminando ? "Guardando..." : "Facturar y terminar"}
               </button>
               <button
                 onClick={() => confirmarModalCola(false)}
                 disabled={terminando}
                 style={{ flex: 1, background: "#6b7280", padding: "11px 0" }}
               >
-                Solo terminar
+                Sin facturar
               </button>
               <button
                 onClick={() => setModalCola(null)}

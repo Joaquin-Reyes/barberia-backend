@@ -26,6 +26,9 @@ function createSupabaseMock(seed) {
       const value = row[filter.column];
       if (filter.type === "eq") return value === filter.value;
       if (filter.type === "ilike") return String(value || "").toLowerCase() === String(filter.value || "").toLowerCase();
+      if (filter.type === "is") return value === filter.value;
+      if (filter.type === "lte") return value <= filter.value;
+      if (filter.type === "gte") return value >= filter.value;
       return true;
     }));
   }
@@ -96,6 +99,21 @@ function createSupabaseMock(seed) {
       },
       ilike(column, value) {
         state.filters.push({ type: "ilike", column, value });
+        return builder;
+      },
+      is(column, value) {
+        state.filters.push({ type: "is", column, value });
+        return builder;
+      },
+      lte(column, value) {
+        state.filters.push({ type: "lte", column, value });
+        return builder;
+      },
+      gte(column, value) {
+        state.filters.push({ type: "gte", column, value });
+        return builder;
+      },
+      limit() {
         return builder;
       },
       order(column) {
@@ -263,6 +281,8 @@ test("barbero puede completar su propio turno cargando servicio y precio", async
     turnos: [
       { id: "turno-juan", barberia_id: "barberia-a", barbero: "Juan", estado: "pendiente", servicio: "", precio: 0 },
     ],
+    pagos: [],
+    cierres_caja: [],
   });
 
   const res = createRes();
@@ -278,6 +298,9 @@ test("barbero puede completar su propio turno cargando servicio y precio", async
   assert.equal(db.turnos[0].estado, "completado");
   assert.equal(db.turnos[0].servicio, "Corte");
   assert.equal(db.turnos[0].precio, 15000);
+  assert.equal(db.pagos.length, 1);
+  assert.equal(db.pagos[0].turno_id, "turno-juan");
+  assert.equal(db.pagos[0].monto, 15000);
 });
 
 test("barbero de Barberia A no modifica turno de Barberia B", async () => {

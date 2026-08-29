@@ -2,10 +2,12 @@ const { supabaseAdmin } = require("../config/supabase");
 const { metadataMatchesBarbero } = require("./auth.controller");
 const { notificarBarbero, enviarTemplateConfirmacion } = require("../services/whatsapp.service");
 const { formatearHora, obtenerHorariosDisponibles } = require("../services/agenda.service");
+const { registrarPagoTurno } = require("../services/pagos.service");
 const { isMissingColumnError, withoutField } = require("../utils/supabase-compat");
 const wwebjsManager = require("../services/wwebjs.manager");
 
 const ESTADOS_TURNO = ["pendiente", "confirmado", "completado", "cancelado"];
+const METODOS_PAGO = ["efectivo", "transferencia", "mercado_pago", "tarjeta", "otro"];
 const CAMPOS_TURNO_ADMIN = ["nombre", "telefono", "servicio", "precio", "barbero", "fecha", "hora", "estado"];
 const CAMPOS_PROHIBIDOS_TURNO = ["id", "barberia_id", "barbero_id", "created_at", "updated_at", "usuario_id"];
 
@@ -187,7 +189,7 @@ async function actualizarEstadoTurno(req, res) {
 
   if (req.user.rol === "barbero") {
     const camposRecibidos = Object.keys(body);
-    const camposPermitidosBarbero = new Set(["estado", "servicio", "precio"]);
+    const camposPermitidosBarbero = new Set(["estado", "servicio", "precio", "metodo_pago"]);
     if (
       !Object.prototype.hasOwnProperty.call(body, "estado") ||
       camposRecibidos.some((campo) => !camposPermitidosBarbero.has(campo))
@@ -199,6 +201,11 @@ async function actualizarEstadoTurno(req, res) {
       return res.status(403).json({ error: "No tenés permisos para esta acción" });
     }
 
+    const metodoPago = body.metodo_pago || "efectivo";
+    if (!METODOS_PAGO.includes(metodoPago)) {
+      return res.status(400).json({ error: "Metodo de pago invalido" });
+    }
+
     const { data: barbero, error: barberoError } = await supabaseAdmin
       .from("barberos")
       .select("nombre")
@@ -208,6 +215,17 @@ async function actualizarEstadoTurno(req, res) {
 
     if (barberoError) return res.status(500).json({ error: "Error validando permisos" });
     if (!barbero) return res.json({ ok: true });
+
+    const { data: turnoBarbero, error: turnoBarberoError } = await supabaseAdmin
+      .from("turnos")
+      .select("id, nombre, servicio, barbero, precio")
+      .eq("id", id)
+      .eq("barberia_id", barberia_id)
+      .eq("barbero", barbero.nombre)
+      .maybeSingle();
+
+    if (turnoBarberoError) return res.status(500).json({ error: "Error buscando turno" });
+    if (!turnoBarbero) return res.json({ ok: true });
 
     const cambiosBarbero = { estado };
     if (Object.prototype.hasOwnProperty.call(body, "servicio")) {
@@ -229,7 +247,18 @@ async function actualizarEstadoTurno(req, res) {
       .eq("barbero", barbero.nombre);
 
     if (error) return res.status(500).json({ error });
-    return res.json({ ok: true });
+
+    const turnoFacturado = { ...turnoBarbero, ...cambiosBarbero };
+    const pagoResult = await registrarPagoTurno({
+      barberia_id,
+      turno: turnoFacturado,
+      monto: turnoFacturado.precio,
+      metodo: metodoPago,
+      creado_por: req.user.id,
+    });
+
+    if (pagoResult.error) return res.status(pagoResult.status || 500).json({ error: pagoResult.error });
+    return res.json({ ok: true, pago_creado: Boolean(pagoResult.created) });
   }
 
   const { data: turnoActual, error: errorTurnoActual } = await supabaseAdmin
