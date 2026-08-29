@@ -535,7 +535,7 @@ export default function Facturacion({ user }) {
       const [resumen, caja, turnos, cierresCaja] = await Promise.all([
         facturacionApi.resumen({ desde, hasta }),
         pagosApi.caja({ desde, hasta }),
-        pagosApi.turnos({ desde, hasta, legacyCompletados: '1' }),
+        pagosApi.turnos({ desde, hasta }),
         pagosApi.cierres({ limit: 10 }),
       ])
       setData(resumen)

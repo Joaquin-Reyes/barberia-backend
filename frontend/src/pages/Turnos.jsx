@@ -83,10 +83,11 @@ function PagosPanel({ turno, onChanged, onToast }) {
     try {
       const resumen = await pagosApi.byTurno(turno.id, { legacyCompletados: "1" });
       const saldo = Number(resumen?.saldo || 0);
+      const total = Number(resumen?.total_cobrable ?? turno?.precio ?? 0);
       setData(resumen);
       setForm((prev) => ({
         ...prev,
-        monto: saldo > 0 ? String(saldo) : "",
+        monto: saldo > 0 ? String(saldo) : resumen?.pago_historico && total > 0 ? String(total) : "",
       }));
     } catch (err) {
       setError(err.message);
@@ -206,7 +207,7 @@ function PagosPanel({ turno, onChanged, onToast }) {
   const saldoPendiente = Number(data?.saldo || 0);
   const montoSuperaSaldo = form.tipo !== "ajuste" && saldoPendiente > 0 && Number(form.monto || 0) > saldoPendiente;
   const totalCobrable = Number(data?.total_cobrable ?? turno?.precio ?? 0);
-  const cobroBloqueado = data && totalCobrable > 0 && Number(data.saldo || 0) <= 0 && form.tipo !== "ajuste";
+  const cobroBloqueado = data && !data.pago_historico && totalCobrable > 0 && Number(data.saldo || 0) <= 0 && form.tipo !== "ajuste";
   const estadoLabel = {
     sin_pagar: "Sin pagar",
     sena: "Con seña",
