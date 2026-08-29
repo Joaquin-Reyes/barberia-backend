@@ -63,7 +63,7 @@ async function getTurnosBarbero(req, res) {
 
     let { data: turnos, error: turnosError } = await supabaseAdmin
       .from("turnos")
-      .select("id, fecha, hora, nombre, servicio, estado")
+      .select("id, fecha, hora, nombre, servicio, precio, estado")
       .eq("barberia_id", barberia_id)
       .or(`barbero_id.eq.${barbero.id},barbero.eq.${barbero.nombre}`)
       .gte("fecha", desde)
@@ -75,7 +75,7 @@ async function getTurnosBarbero(req, res) {
       console.log("⚠️ turnos.barbero_id no existe en DB; listando turnos por nombre de barbero");
       ({ data: turnos, error: turnosError } = await supabaseAdmin
         .from("turnos")
-        .select("id, fecha, hora, nombre, servicio, estado")
+        .select("id, fecha, hora, nombre, servicio, precio, estado")
         .eq("barberia_id", barberia_id)
         .eq("barbero", barbero.nombre)
         .gte("fecha", desde)

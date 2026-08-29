@@ -81,7 +81,7 @@ function PagosPanel({ turno, onChanged, onToast }) {
     setLoading(true);
     setError("");
     try {
-      const resumen = await pagosApi.byTurno(turno.id);
+      const resumen = await pagosApi.byTurno(turno.id, { legacyCompletados: "1" });
       const saldo = Number(resumen?.saldo || 0);
       setData(resumen);
       setForm((prev) => ({
@@ -205,7 +205,8 @@ function PagosPanel({ turno, onChanged, onToast }) {
   const activos = pagos.filter((p) => !p.anulado_at);
   const saldoPendiente = Number(data?.saldo || 0);
   const montoSuperaSaldo = form.tipo !== "ajuste" && saldoPendiente > 0 && Number(form.monto || 0) > saldoPendiente;
-  const cobroBloqueado = data && Number(data.saldo || 0) <= 0 && form.tipo !== "ajuste";
+  const totalCobrable = Number(data?.total_cobrable ?? turno?.precio ?? 0);
+  const cobroBloqueado = data && totalCobrable > 0 && Number(data.saldo || 0) <= 0 && form.tipo !== "ajuste";
   const estadoLabel = {
     sin_pagar: "Sin pagar",
     sena: "Con seña",
@@ -252,6 +253,18 @@ function PagosPanel({ turno, onChanged, onToast }) {
           <strong>{estadoLabel}</strong>
         </div>
       </div>
+
+      {data?.pago_historico && (
+        <div className="turno-pagos-warning">
+          Turno completado histórico: figura saldado aunque no tenga un pago cargado en caja.
+        </div>
+      )}
+
+      {data && totalCobrable <= 0 && (
+        <div className="turno-pagos-warning">
+          Este turno no tiene servicio o precio cargado. Editalo para completar esos datos o ingresá el monto manualmente.
+        </div>
+      )}
 
       <div className="turno-productos-box">
         <div className="turno-productos-head">

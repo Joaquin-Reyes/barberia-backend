@@ -187,7 +187,11 @@ async function actualizarEstadoTurno(req, res) {
 
   if (req.user.rol === "barbero") {
     const camposRecibidos = Object.keys(body);
-    if (camposRecibidos.length !== 1 || !Object.prototype.hasOwnProperty.call(body, "estado")) {
+    const camposPermitidosBarbero = new Set(["estado", "servicio", "precio"]);
+    if (
+      !Object.prototype.hasOwnProperty.call(body, "estado") ||
+      camposRecibidos.some((campo) => !camposPermitidosBarbero.has(campo))
+    ) {
       return res.status(403).json({ error: "No tenés permisos para esta acción" });
     }
 
@@ -205,9 +209,21 @@ async function actualizarEstadoTurno(req, res) {
     if (barberoError) return res.status(500).json({ error: "Error validando permisos" });
     if (!barbero) return res.json({ ok: true });
 
+    const cambiosBarbero = { estado };
+    if (Object.prototype.hasOwnProperty.call(body, "servicio")) {
+      cambiosBarbero.servicio = String(body.servicio || "").trim();
+    }
+    if (Object.prototype.hasOwnProperty.call(body, "precio")) {
+      const precio = Number(body.precio);
+      if (!Number.isFinite(precio) || precio < 0) {
+        return res.status(400).json({ error: "Precio invalido" });
+      }
+      cambiosBarbero.precio = precio;
+    }
+
     const { error } = await supabaseAdmin
       .from("turnos")
-      .update({ estado })
+      .update(cambiosBarbero)
       .eq("id", id)
       .eq("barberia_id", barberia_id)
       .eq("barbero", barbero.nombre);

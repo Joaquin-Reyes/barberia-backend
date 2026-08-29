@@ -123,6 +123,8 @@ export default function PanelBarbero({ user }) {
           nombre_cliente: turnoDue.nombre,
           hora: turnoDue.hora,
           turno_id: turnoDue.id,
+          servicio: turnoDue.servicio,
+          precio: turnoDue.precio,
         });
         return;
       }
@@ -186,9 +188,12 @@ export default function PanelBarbero({ user }) {
 
   function terminar() {
     if (!barberoId || !proximoCliente) return;
-    if (proximoCliente.tipo === "cola_espera") {
-      setServicioCola("");
-      setPrecioCola("");
+    if (
+      proximoCliente.tipo === "cola_espera" ||
+      (proximoCliente.tipo === "turno_reservado" && (!String(proximoCliente.servicio || "").trim() || !Number(proximoCliente.precio)))
+    ) {
+      setServicioCola(proximoCliente.servicio || "");
+      setPrecioCola(proximoCliente.precio ? String(proximoCliente.precio) : "");
       setModalCola({ nombre_cliente: proximoCliente.nombre_cliente });
     } else {
       ejecutarTerminar(null);
@@ -201,18 +206,24 @@ export default function PanelBarbero({ user }) {
     try {
       // Si es turno reservado, marcarlo como completado
       if (proximoCliente?.tipo === "turno_reservado" && proximoCliente.turno_id) {
+        const body = { estado: "completado" };
+        if (datosServicio) {
+          body.servicio = datosServicio.servicio;
+          body.precio = datosServicio.precio;
+        }
+
         const res = await fetch(`${API}/admin/turnos/${proximoCliente.turno_id}`, {
           method: "PUT",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ estado: "completado" }),
+          body: JSON.stringify(body),
         });
         if (!res.ok) throw new Error(await parseApiError(res, "Error completando turno"));
         setTurnos((prev) =>
           prev.map((t) =>
-            t.id === proximoCliente.turno_id ? { ...t, estado: "completado" } : t
+            t.id === proximoCliente.turno_id ? { ...t, ...body } : t
           )
         );
         mostrarToast("Turno completado");

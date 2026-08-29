@@ -255,6 +255,31 @@ test("barbero puede completar su propio turno", async () => {
   assert.equal(db.turnos[0].estado, "completado");
 });
 
+test("barbero puede completar su propio turno cargando servicio y precio", async () => {
+  const { db } = createSupabaseMock({
+    barberos: [
+      { id: "barbero-juan", usuario_id: "user-juan", barberia_id: "barberia-a", nombre: "Juan" },
+    ],
+    turnos: [
+      { id: "turno-juan", barberia_id: "barberia-a", barbero: "Juan", estado: "pendiente", servicio: "", precio: 0 },
+    ],
+  });
+
+  const res = createRes();
+  await adminController.actualizarEstadoTurno(
+    authReq(
+      { id: "user-juan", rol: "barbero", barberia_id: "barberia-a" },
+      { params: { id: "turno-juan" }, body: { estado: "completado", servicio: "Corte", precio: 15000 } }
+    ),
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.turnos[0].estado, "completado");
+  assert.equal(db.turnos[0].servicio, "Corte");
+  assert.equal(db.turnos[0].precio, 15000);
+});
+
 test("barbero de Barberia A no modifica turno de Barberia B", async () => {
   const { db } = createSupabaseMock({
     barberos: [
