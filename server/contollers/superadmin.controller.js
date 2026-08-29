@@ -4,7 +4,7 @@ async function listarBarberias(req, res) {
   try {
     const { data, error } = await supabaseAdmin
       .from("barberias")
-      .select("*")
+      .select("id, nombre, activo, whatsapp_mode, phone_number_id, whatsapp_number, created_at")
       .order("nombre", { ascending: true });
 
     if (error) {
@@ -76,17 +76,27 @@ async function crearBarberia(req, res) {
 async function actualizarBarberia(req, res) {
   const { id } = req.params;
   const campos = req.body;
+  const camposPermitidos = ["activo", "whatsapp_mode", "phone_number_id", "whatsapp_token", "whatsapp_number"];
 
   if (!id || !campos || Object.keys(campos).length === 0) {
     return res.status(400).json({ error: "Faltan datos" });
   }
 
+  const cambios = {};
+  for (const campo of camposPermitidos) {
+    if (Object.prototype.hasOwnProperty.call(campos, campo)) cambios[campo] = campos[campo];
+  }
+
+  if (Object.keys(cambios).length === 0) {
+    return res.status(400).json({ error: "No hay campos validos para actualizar" });
+  }
+
   try {
     const { data, error } = await supabaseAdmin
       .from("barberias")
-      .update(campos)
+      .update(cambios)
       .eq("id", id)
-      .select()
+      .select("id, nombre, activo, whatsapp_mode, phone_number_id, whatsapp_number, created_at")
       .single();
 
     if (error) {

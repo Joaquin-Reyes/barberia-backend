@@ -68,49 +68,31 @@ export default function PanelBarbero({ user }) {
 
     setCargandoTurnos(true);
     try {
-      const requests = [
-        fetch(`${API}/cola/${user.barberia_id}`, {
+      const fetchTurnos = async (rango) => {
+        const res = await fetch(`${API}/barbero/turnos?rango=${rango}`, {
           headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch(`${API}/barbero/turnos?rango=${rangoTurnos}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-      ];
+        });
+        if (!res.ok) throw new Error(await parseApiError(res, "Error al cargar turnos"));
+        return res.json();
+      };
 
+      const data = await fetchTurnos(rangoTurnos);
+      const turnosListado = data.turnos || [];
+      setTurnos(turnosListado);
+
+      let bId = data.barbero_id || null;
+      if (bId) {
+        setBarberoId(bId);
+      }
+
+      let turnosHoy = turnosListado;
       if (rangoTurnos !== "hoy") {
-        requests.push(fetch(`${API}/barbero/turnos?rango=hoy`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }));
-      }
-
-      const [colaRes, turnosRes, turnosHoyRes] = await Promise.all(requests);
-
-      let bId = null;
-      let turnosListado = [];
-      let turnosHoy = [];
-      if (turnosRes.ok) {
-        const data = await turnosRes.json();
-        turnosListado = data.turnos || [];
-        setTurnos(turnosListado);
-        if (data.barbero_id) {
-          setBarberoId(data.barbero_id);
-          bId = data.barbero_id;
-        }
-      } else {
-        throw new Error(await parseApiError(turnosRes, "Error al cargar turnos"));
-      }
-
-      if (rangoTurnos === "hoy") {
-        turnosHoy = turnosListado;
-      } else if (turnosHoyRes?.ok) {
-        const dataHoy = await turnosHoyRes.json();
+        const dataHoy = await fetchTurnos("hoy");
         turnosHoy = dataHoy.turnos || [];
         if (!bId && dataHoy.barbero_id) {
           setBarberoId(dataHoy.barbero_id);
           bId = dataHoy.barbero_id;
         }
-      } else if (turnosHoyRes) {
-        throw new Error(await parseApiError(turnosHoyRes, "Error al cargar turnos de hoy"));
       }
 
       // Prioridad 1: turno pendiente cuya hora ya llegó
@@ -138,6 +120,9 @@ export default function PanelBarbero({ user }) {
       }
 
       // Prioridad 2: cliente actual en cola de espera
+      const colaRes = await fetch(`${API}/cola/${user.barberia_id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (colaRes.ok) {
         const data = await colaRes.json();
         const miBarbero = (data.barberos || []).find((b) => b.id === bId);
@@ -277,7 +262,7 @@ export default function PanelBarbero({ user }) {
         mostrarToast("Ingresá el servicio realizado", "error");
         return;
       }
-      if (precioCola !== "" && (!Number.isFinite(precio) || precio < 0)) {
+      if (!Number.isFinite(precio) || precio <= 0) {
         mostrarToast("Ingresá un precio válido", "error");
         return;
       }
@@ -366,6 +351,8 @@ export default function PanelBarbero({ user }) {
             </label>
             <input
               type="number"
+              min="1"
+              step="1"
               placeholder="0"
               value={precioCola}
               onChange={e => setPrecioCola(e.target.value)}
@@ -392,13 +379,6 @@ export default function PanelBarbero({ user }) {
                 style={{ flex: 1, background: "#16a34a", padding: "11px 0" }}
               >
                 {terminando ? "Guardando..." : "Facturar y terminar"}
-              </button>
-              <button
-                onClick={() => confirmarModalCola(false)}
-                disabled={terminando}
-                style={{ flex: 1, background: "#6b7280", padding: "11px 0" }}
-              >
-                Sin facturar
               </button>
               <button
                 onClick={() => setModalCola(null)}

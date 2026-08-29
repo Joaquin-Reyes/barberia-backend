@@ -15,6 +15,8 @@ export default function SuperAdminPanel({ user, onLogout }) {
     whatsapp_token: "",
     whatsapp_number: "",
   });
+  const [cargandoBarberias, setCargandoBarberias] = useState(true);
+  const [guardandoId, setGuardandoId] = useState(null);
   const [toast, setToast] = useState(null);
 
   const mostrarToast = useCallback((mensaje, tipo = "success") => {
@@ -23,22 +25,27 @@ export default function SuperAdminPanel({ user, onLogout }) {
   }, []);
 
   const traerBarberias = useCallback(async () => {
+    setCargandoBarberias(true);
     const token = await getAuthToken();
-    const res = await fetch(`${API}/superadmin/barberias`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    const data = await res.json().catch(() => []);
-    if (!res.ok) {
-      console.error("Error trayendo barberías:", data);
-      mostrarToast(data.error || "Error trayendo barberías", "error");
-      return;
+    try {
+      const res = await fetch(`${API}/superadmin/barberias`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json().catch(() => []);
+      if (!res.ok) {
+        console.error("Error trayendo barberías:", data);
+        mostrarToast(data.error || "Error trayendo barberías", "error");
+        return;
+      }
+      const barberiasOrdenadas = [...(data || [])].sort((a, b) =>
+        String(a.nombre || "").localeCompare(String(b.nombre || ""))
+      );
+      setBarberias(barberiasOrdenadas);
+    } finally {
+      setCargandoBarberias(false);
     }
-    const barberiasOrdenadas = [...(data || [])].sort((a, b) =>
-      String(a.nombre || "").localeCompare(String(b.nombre || ""))
-    );
-    setBarberias(barberiasOrdenadas);
   }, [mostrarToast]);
 
   useEffect(() => {
@@ -75,42 +82,52 @@ async function crearBarberia() {
 }
 
   async function toggleActiva(barberia) {
+    setGuardandoId(barberia.id);
     const token = await getAuthToken();
-    const res = await fetch(`${API}/superadmin/barberias/${barberia.id}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ activo: !barberia.activo }),
-    });
-    if (res.ok) traerBarberias();
-    else mostrarToast("Error al cambiar estado", "error");
+    try {
+      const res = await fetch(`${API}/superadmin/barberias/${barberia.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ activo: !barberia.activo }),
+      });
+      if (res.ok) traerBarberias();
+      else mostrarToast("Error al cambiar estado", "error");
+    } finally {
+      setGuardandoId(null);
+    }
   }
 
   async function guardarWhatsapp(id) {
+    setGuardandoId(id);
     const token = await getAuthToken();
-    const res = await fetch(`${API}/superadmin/barberias/${id}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        whatsapp_mode: whatsappForm.whatsapp_mode,
-        phone_number_id: whatsappForm.phone_number_id,
-        whatsapp_token: whatsappForm.whatsapp_token,
-        whatsapp_number: whatsappForm.whatsapp_number,
-      }),
-    });
+    try {
+      const res = await fetch(`${API}/superadmin/barberias/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          whatsapp_mode: whatsappForm.whatsapp_mode,
+          phone_number_id: whatsappForm.phone_number_id,
+          whatsapp_token: whatsappForm.whatsapp_token,
+          whatsapp_number: whatsappForm.whatsapp_number,
+        }),
+      });
 
-    if (res.ok) {
-      mostrarToast("WhatsApp configurado");
-      setConfigurando(null);
-      setWhatsappForm({ whatsapp_mode: "cloud_api", phone_number_id: "", whatsapp_token: "", whatsapp_number: "" });
-      traerBarberias();
-    } else {
-      mostrarToast("Error al guardar", "error");
+      if (res.ok) {
+        mostrarToast("WhatsApp configurado");
+        setConfigurando(null);
+        setWhatsappForm({ whatsapp_mode: "cloud_api", phone_number_id: "", whatsapp_token: "", whatsapp_number: "" });
+        traerBarberias();
+      } else {
+        mostrarToast("Error al guardar", "error");
+      }
+    } finally {
+      setGuardandoId(null);
     }
   }
 
@@ -170,6 +187,11 @@ async function crearBarberia() {
           Barberías
         </h2>
         <div className="space-y-3">
+          {cargandoBarberias && (
+            <div className="bg-neutral-800 p-3 rounded text-sm text-neutral-400">
+              Cargando barberías...
+            </div>
+          )}
           {barberias.map((b) => (
             <div key={b.id} className="bg-neutral-800 p-3 rounded">
 
@@ -212,14 +234,16 @@ async function crearBarberia() {
                       }
                     }}
                     className="bg-neutral-600 px-3 py-1 rounded text-sm"
+                    disabled={guardandoId === b.id}
                   >
                     {configurando === b.id ? "Cerrar" : "WhatsApp"}
                   </button>
                   <button
                     onClick={() => toggleActiva(b)}
                     className={`px-3 py-1 rounded text-sm ${b.activo ? "bg-green-600" : "bg-red-600"}`}
+                    disabled={guardandoId === b.id}
                   >
-                    {b.activo ? "Activa" : "Inactiva"}
+                    {guardandoId === b.id ? "Guardando..." : b.activo ? "Activa" : "Inactiva"}
                   </button>
                 </div>
               </div>
@@ -257,8 +281,9 @@ async function crearBarberia() {
                   <button
                     onClick={() => guardarWhatsapp(b.id)}
                     className="bg-green-600 py-2 rounded text-sm"
+                    disabled={guardandoId === b.id}
                   >
-                    Guardar configuración
+                    {guardandoId === b.id ? "Guardando..." : "Guardar configuración"}
                   </button>
                 </div>
               )}

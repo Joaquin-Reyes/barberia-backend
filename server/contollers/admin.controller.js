@@ -2,7 +2,7 @@ const { supabaseAdmin } = require("../config/supabase");
 const { metadataMatchesBarbero } = require("./auth.controller");
 const { notificarBarbero, enviarTemplateConfirmacion } = require("../services/whatsapp.service");
 const { formatearHora, obtenerHorariosDisponibles } = require("../services/agenda.service");
-const { registrarPagoTurno } = require("../services/pagos.service");
+const { registrarPagoTurno, validarPagoTurno } = require("../services/pagos.service");
 const { isMissingColumnError, withoutField } = require("../utils/supabase-compat");
 const wwebjsManager = require("../services/wwebjs.manager");
 
@@ -168,7 +168,9 @@ async function listarTurnos(req, res) {
     .eq("barberia_id", barberia_id);
   if (fecha) query = query.eq("fecha", fecha);
 
-  const { data, error } = await query.order("hora", { ascending: true });
+  const { data, error } = await query
+    .order("fecha", { ascending: true })
+    .order("hora", { ascending: true });
   if (error) return res.status(500).json({ error });
   res.json(data);
 }
@@ -239,6 +241,18 @@ async function actualizarEstadoTurno(req, res) {
       cambiosBarbero.precio = precio;
     }
 
+    const turnoFacturado = { ...turnoBarbero, ...cambiosBarbero };
+    const validacionPago = await validarPagoTurno({
+      barberia_id,
+      turno_id: turnoFacturado.id,
+      monto: turnoFacturado.precio,
+      metodo: metodoPago,
+    });
+
+    if (!validacionPago.ok) {
+      return res.status(validacionPago.status || 500).json({ error: validacionPago.error });
+    }
+
     const { error } = await supabaseAdmin
       .from("turnos")
       .update(cambiosBarbero)
@@ -248,7 +262,6 @@ async function actualizarEstadoTurno(req, res) {
 
     if (error) return res.status(500).json({ error });
 
-    const turnoFacturado = { ...turnoBarbero, ...cambiosBarbero };
     const pagoResult = await registrarPagoTurno({
       barberia_id,
       turno: turnoFacturado,

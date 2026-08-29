@@ -420,15 +420,18 @@ export default function Turnos({ user }) {
   }, [rolUsuario]);
 
   const traerTurnos = useCallback(async () => {
-    const { data } = await supabase
-      .from("turnos").select("*")
-      .eq("barberia_id", barberiaId)
-      .order("fecha", { ascending: true })
-      .order("hora", { ascending: true });
+    const token = await getAuthToken();
+    const res = await fetch(`${API}/admin/turnos`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json().catch(() => []);
+    if (!res.ok) {
+      throw new Error(data.error || "No se pudieron cargar los turnos");
+    }
     const list = data || [];
     setTurnos(list);
-    await cargarEstadosPago(list);
-  }, [barberiaId, cargarEstadosPago]);
+    cargarEstadosPago(list);
+  }, [cargarEstadosPago]);
 
   const traerBarberos = useCallback(async () => {
     const { data } = await supabase
@@ -466,7 +469,11 @@ export default function Turnos({ user }) {
   useEffect(() => {
     if (!user) return;
     async function cargarDatos() {
-      await Promise.all([traerTurnos(), traerBarberos(), traerServicios()]);
+      try {
+        await Promise.all([traerTurnos(), traerBarberos(), traerServicios()]);
+      } catch (err) {
+        mostrarToast(err.message || "Error cargando datos", "error");
+      }
     }
     cargarDatos();
   }, [traerBarberos, traerServicios, traerTurnos, user]);

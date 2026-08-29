@@ -303,6 +303,40 @@ test("barbero puede completar su propio turno cargando servicio y precio", async
   assert.equal(db.pagos[0].monto, 15000);
 });
 
+test("barbero no completa turno con cobro si la caja esta cerrada", async () => {
+  const { db } = createSupabaseMock({
+    barberos: [
+      { id: "barbero-juan", usuario_id: "user-juan", barberia_id: "barberia-a", nombre: "Juan" },
+    ],
+    turnos: [
+      { id: "turno-juan", barberia_id: "barberia-a", barbero: "Juan", estado: "pendiente", servicio: "", precio: 0 },
+    ],
+    pagos: [],
+    cierres_caja: [
+      {
+        id: "cierre-a",
+        barberia_id: "barberia-a",
+        fecha_desde: "2020-01-01",
+        fecha_hasta: "2099-12-31",
+        anulado_at: null,
+      },
+    ],
+  });
+
+  const res = createRes();
+  await adminController.actualizarEstadoTurno(
+    authReq(
+      { id: "user-juan", rol: "barbero", barberia_id: "barberia-a" },
+      { params: { id: "turno-juan" }, body: { estado: "completado", servicio: "Corte", precio: 15000 } }
+    ),
+    res
+  );
+
+  assert.equal(res.statusCode, 409);
+  assert.equal(db.turnos[0].estado, "pendiente");
+  assert.equal(db.pagos.length, 0);
+});
+
 test("barbero de Barberia A no modifica turno de Barberia B", async () => {
   const { db } = createSupabaseMock({
     barberos: [

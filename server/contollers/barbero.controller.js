@@ -1,6 +1,6 @@
 const { supabaseAdmin } = require("../config/supabase");
 const { isMissingColumnError, withoutField } = require("../utils/supabase-compat");
-const { registrarPagoTurno } = require("../services/pagos.service");
+const { registrarPagoTurno, validarPagoTurno } = require("../services/pagos.service");
 
 const APP_TIME_ZONE = "America/Argentina/Buenos_Aires";
 const RANGOS_TURNOS = new Set(["hoy", "manana", "semana"]);
@@ -127,6 +127,15 @@ async function registrarAtencionCola(req, res) {
 
     const hoy = fechaLocal(0);
     const hora = horaLocal();
+    const validacionPago = await validarPagoTurno({
+      barberia_id,
+      monto: precio,
+      metodo: metodo_pago,
+    });
+
+    if (!validacionPago.ok) {
+      return res.status(validacionPago.status || 500).json({ error: validacionPago.error });
+    }
 
     const turnoInsert = {
       nombre: nombre_cliente,

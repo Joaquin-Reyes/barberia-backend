@@ -23,6 +23,37 @@ async function tieneCierreCaja(barberiaId, fecha) {
   return Boolean(data);
 }
 
+async function validarPagoTurno({ barberia_id, turno_id, monto, metodo = "efectivo" }) {
+  const amount = asMoney(monto);
+  if (amount <= 0) return { ok: true, shouldCreate: false, reason: "monto_invalido" };
+  if (!METODOS.includes(metodo)) return { ok: false, error: "metodo invalido", status: 400 };
+
+  const fechaPago = businessDate();
+  if (await tieneCierreCaja(barberia_id, fechaPago)) {
+    return {
+      ok: false,
+      error: "La caja de hoy ya está cerrada. Anulá el cierre antes de registrar otro pago.",
+      status: 409,
+    };
+  }
+
+  if (!turno_id) return { ok: true, shouldCreate: true };
+
+  const { data: pagoExistente, error: pagoExistenteError } = await supabaseAdmin
+    .from("pagos")
+    .select("id")
+    .eq("barberia_id", barberia_id)
+    .eq("turno_id", turno_id)
+    .is("anulado_at", null)
+    .limit(1)
+    .maybeSingle();
+
+  if (pagoExistenteError) throw pagoExistenteError;
+  if (pagoExistente) return { ok: true, shouldCreate: false, reason: "pago_existente", pago: pagoExistente };
+
+  return { ok: true, shouldCreate: true };
+}
+
 async function registrarPagoTurno({
   barberia_id,
   turno,
@@ -33,29 +64,9 @@ async function registrarPagoTurno({
   nota,
 }) {
   const amount = asMoney(monto);
-  if (!turno?.id || amount <= 0) return { created: false, reason: "monto_invalido" };
-  if (!METODOS.includes(metodo)) return { created: false, error: "metodo invalido", status: 400 };
-
-  const fechaPago = businessDate();
-  if (await tieneCierreCaja(barberia_id, fechaPago)) {
-    return {
-      created: false,
-      error: "La caja de hoy ya está cerrada. Anulá el cierre antes de registrar otro pago.",
-      status: 409,
-    };
-  }
-
-  const { data: pagoExistente, error: pagoExistenteError } = await supabaseAdmin
-    .from("pagos")
-    .select("id")
-    .eq("barberia_id", barberia_id)
-    .eq("turno_id", turno.id)
-    .is("anulado_at", null)
-    .limit(1)
-    .maybeSingle();
-
-  if (pagoExistenteError) throw pagoExistenteError;
-  if (pagoExistente) return { created: false, reason: "pago_existente", pago: pagoExistente };
+  const validacion = await validarPagoTurno({ barberia_id, turno_id: turno?.id, monto: amount, metodo });
+  if (!validacion.ok) return { created: false, error: validacion.error, status: validacion.status };
+  if (!validacion.shouldCreate) return { created: false, reason: validacion.reason, pago: validacion.pago };
 
   const { data, error } = await supabaseAdmin
     .from("pagos")
@@ -80,4 +91,5 @@ async function registrarPagoTurno({
 
 module.exports = {
   registrarPagoTurno,
+  validarPagoTurno,
 };
