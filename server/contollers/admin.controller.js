@@ -158,19 +158,48 @@ async function crearTurno(req, res) {
   }
 }
 
+function isDateParam(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim());
+}
+
+function normalizePositiveInt(value, fallback, max) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.min(parsed, max);
+}
+
 async function listarTurnos(req, res) {
-  const { fecha } = req.query;
+  const { fecha, desde, hasta, q } = req.query;
   const barberia_id = req.user.barberia_id;
 
   let query = supabaseAdmin
     .from("turnos")
-    .select("*")
+    .select("id, nombre, telefono, servicio, precio, barbero, barbero_id, fecha, hora, estado, created_at")
     .eq("barberia_id", barberia_id);
-  if (fecha) query = query.eq("fecha", fecha);
+
+  if (fecha) {
+    if (!isDateParam(fecha)) return res.status(400).json({ error: "Fecha invalida" });
+    query = query.eq("fecha", fecha);
+  } else {
+    if (desde) {
+      if (!isDateParam(desde)) return res.status(400).json({ error: "Fecha desde invalida" });
+      query = query.gte("fecha", desde);
+    }
+    if (hasta) {
+      if (!isDateParam(hasta)) return res.status(400).json({ error: "Fecha hasta invalida" });
+      query = query.lte("fecha", hasta);
+    }
+  }
+
+  const texto = String(q || "").trim();
+  if (texto) query = query.ilike("nombre", `%${texto.slice(0, 80)}%`);
+
+  const limit = normalizePositiveInt(req.query.limit, 300, 1000);
 
   const { data, error } = await query
     .order("fecha", { ascending: true })
-    .order("hora", { ascending: true });
+    .order("hora", { ascending: true })
+    .limit(limit);
   if (error) return res.status(500).json({ error });
   res.json(data);
 }

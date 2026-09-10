@@ -4,6 +4,7 @@ import { supabase, turnoDisponible, getAuthToken } from "../lib/supabase";
 import { pagos as pagosApi, productos as productosApi, turnos as turnosApi } from "../lib/api";
 
 const API = "https://barberia-backend-production-7dae.up.railway.app";
+const MS_DIA = 24 * 60 * 60 * 1000;
 
 const METODOS_PAGO = [
   ["efectivo", "Efectivo"],
@@ -26,6 +27,20 @@ function money(value) {
 
 function labelText(value) {
   return String(value || "-").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function fechaISO(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function rangoInicialTurnos() {
+  const hoy = new Date();
+  const desde = new Date(hoy.getTime() - 30 * MS_DIA);
+  const hasta = new Date(hoy.getTime() + 60 * MS_DIA);
+  return { desde: fechaISO(desde), hasta: fechaISO(hasta) };
 }
 
 function PagoBadge({ estado }) {
@@ -386,7 +401,9 @@ export default function Turnos({ user }) {
     nombre: "", telefono: "", servicio: "", precio: "", barbero: "", fecha: "", hora: "",
   });
   const [busqueda, setBusqueda] = useState("");
+  const [busquedaApi, setBusquedaApi] = useState("");
   const [filtroFecha, setFiltroFecha] = useState("");
+  const [rangoTurnos] = useState(() => rangoInicialTurnos());
   const [editando, setEditando] = useState({ id: null, valores: null });
   const [pagosPorTurno, setPagosPorTurno] = useState({});
   const [turnoPagosAbierto, setTurnoPagosAbierto] = useState(null);
@@ -416,7 +433,18 @@ export default function Turnos({ user }) {
 
   const traerTurnos = useCallback(async () => {
     const token = await getAuthToken();
-    const res = await fetch(`${API}/admin/turnos`, {
+    const params = new URLSearchParams();
+    if (filtroFecha) {
+      params.set("fecha", filtroFecha);
+    } else {
+      params.set("desde", rangoTurnos.desde);
+      params.set("hasta", rangoTurnos.hasta);
+    }
+    if (busquedaApi.trim()) params.set("q", busquedaApi.trim());
+    params.set("limit", busquedaApi.trim() ? "1000" : "300");
+
+    const qs = params.toString();
+    const res = await fetch(`${API}/admin/turnos${qs ? `?${qs}` : ""}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await res.json().catch(() => []);
@@ -426,7 +454,7 @@ export default function Turnos({ user }) {
     const list = data || [];
     setTurnos(list);
     cargarEstadosPago(list);
-  }, [cargarEstadosPago]);
+  }, [busquedaApi, cargarEstadosPago, filtroFecha, rangoTurnos.desde, rangoTurnos.hasta]);
 
   const traerBarberos = useCallback(async () => {
     const { data } = await supabase
@@ -472,6 +500,11 @@ export default function Turnos({ user }) {
     }
     cargarDatos();
   }, [traerBarberos, traerServicios, traerTurnos, user]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setBusquedaApi(busqueda.trim()), 350);
+    return () => clearTimeout(timer);
+  }, [busqueda]);
 
   useEffect(() => {
     if (!nuevo.barbero || !nuevo.fecha || !user) return;
@@ -952,7 +985,6 @@ export default function Turnos({ user }) {
                     <PagosPanel
                       turno={t}
                       onChanged={() => {
-                        cargarEstadosPago(turnos);
                         traerTurnos();
                       }}
                       onToast={mostrarToast}
@@ -1192,7 +1224,6 @@ export default function Turnos({ user }) {
                           <PagosPanel
                             turno={t}
                             onChanged={() => {
-                              cargarEstadosPago(turnos);
                               traerTurnos();
                             }}
                             onToast={mostrarToast}

@@ -25,7 +25,10 @@ function createSupabaseMock(seed) {
     return rows.filter((row) => filters.every((filter) => {
       const value = row[filter.column];
       if (filter.type === "eq") return value === filter.value;
-      if (filter.type === "ilike") return String(value || "").toLowerCase() === String(filter.value || "").toLowerCase();
+      if (filter.type === "ilike") {
+        const needle = String(filter.value || "").replaceAll("%", "").toLowerCase();
+        return String(value || "").toLowerCase().includes(needle);
+      }
       if (filter.type === "is") return value === filter.value;
       if (filter.type === "lte") return value <= filter.value;
       if (filter.type === "gte") return value >= filter.value;
@@ -204,6 +207,45 @@ test("usuario de Barberia A no lista turnos de Barberia B al filtrar por fecha",
 
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body.map((turno) => turno.id), ["turno-a"]);
+});
+
+test("listar turnos permite acotar por rango de fechas y busqueda", async () => {
+  createSupabaseMock({
+    turnos: [
+      { id: "turno-antes", barberia_id: "barberia-a", fecha: "2026-08-01", hora: "09:00", nombre: "Ana" },
+      { id: "turno-ana", barberia_id: "barberia-a", fecha: "2026-08-22", hora: "09:00", nombre: "Ana Gomez" },
+      { id: "turno-luis", barberia_id: "barberia-a", fecha: "2026-08-23", hora: "10:00", nombre: "Luis" },
+      { id: "turno-otra-barberia", barberia_id: "barberia-b", fecha: "2026-08-22", hora: "11:00", nombre: "Ana" },
+    ],
+  });
+
+  const res = createRes();
+  await adminController.listarTurnos(
+    authReq(
+      { id: "user-a", rol: "admin", barberia_id: "barberia-a" },
+      { query: { desde: "2026-08-20", hasta: "2026-08-31", q: "ana" } }
+    ),
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.map((turno) => turno.id), ["turno-ana"]);
+});
+
+test("listar turnos rechaza fechas invalidas", async () => {
+  createSupabaseMock({ turnos: [] });
+
+  const res = createRes();
+  await adminController.listarTurnos(
+    authReq(
+      { id: "user-a", rol: "admin", barberia_id: "barberia-a" },
+      { query: { desde: "22-08-2026" } }
+    ),
+    res
+  );
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error, "Fecha desde invalida");
 });
 
 test("usuario de Barberia A no actualiza turno de Barberia B aunque conozca el ID", async () => {
