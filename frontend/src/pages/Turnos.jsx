@@ -38,7 +38,7 @@ function fechaISO(date) {
 
 function rangoInicialTurnos() {
   const hoy = new Date();
-  const desde = new Date(hoy.getTime() - 30 * MS_DIA);
+  const desde = hoy;
   const hasta = new Date(hoy.getTime() + 60 * MS_DIA);
   return { desde: fechaISO(desde), hasta: fechaISO(hasta) };
 }
