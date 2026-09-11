@@ -404,6 +404,7 @@ export default function Turnos({ user }) {
   const [busquedaApi, setBusquedaApi] = useState("");
   const [filtroFecha, setFiltroFecha] = useState("");
   const [rangoTurnos] = useState(() => rangoInicialTurnos());
+  const [cargandoTurnos, setCargandoTurnos] = useState(false);
   const [editando, setEditando] = useState({ id: null, valores: null });
   const [pagosPorTurno, setPagosPorTurno] = useState({});
   const [turnoPagosAbierto, setTurnoPagosAbierto] = useState(null);
@@ -432,6 +433,7 @@ export default function Turnos({ user }) {
   }, [rolUsuario]);
 
   const traerTurnos = useCallback(async () => {
+    setCargandoTurnos(true);
     const token = await getAuthToken();
     const params = new URLSearchParams();
     if (filtroFecha) {
@@ -444,16 +446,20 @@ export default function Turnos({ user }) {
     params.set("limit", busquedaApi.trim() ? "1000" : "300");
 
     const qs = params.toString();
-    const res = await fetch(`${API}/admin/turnos${qs ? `?${qs}` : ""}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json().catch(() => []);
-    if (!res.ok) {
-      throw new Error(data.error || "No se pudieron cargar los turnos");
+    try {
+      const res = await fetch(`${API}/admin/turnos${qs ? `?${qs}` : ""}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => []);
+      if (!res.ok) {
+        throw new Error(data.error || "No se pudieron cargar los turnos");
+      }
+      const list = data || [];
+      setTurnos(list);
+      cargarEstadosPago(list);
+    } finally {
+      setCargandoTurnos(false);
     }
-    const list = data || [];
-    setTurnos(list);
-    cargarEstadosPago(list);
   }, [busquedaApi, cargarEstadosPago, filtroFecha, rangoTurnos.desde, rangoTurnos.hasta]);
 
   const traerBarberos = useCallback(async () => {
@@ -835,6 +841,11 @@ export default function Turnos({ user }) {
           <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 14 }}>
             <Search size={14} color="#475569" />
             <h2 style={{ margin: 0 }}>Buscar turnos</h2>
+            {cargandoTurnos && (
+              <span style={{ fontSize: 12, color: "#64748B", marginLeft: 4 }}>
+                Actualizando...
+              </span>
+            )}
           </div>
           <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
             <input
@@ -859,7 +870,9 @@ export default function Turnos({ user }) {
           </div>
 
           <div className="turnos-mobile-list">
-            {turnosFiltrados.length === 0 ? (
+            {cargandoTurnos && turnosFiltrados.length === 0 ? (
+              <div className="turno-mobile-empty">Cargando turnos...</div>
+            ) : turnosFiltrados.length === 0 ? (
               <div className="turno-mobile-empty">No hay turnos para mostrar</div>
             ) : turnosFiltrados.map((t) => {
               const enEdicion = editando.id === t.id;
@@ -1012,7 +1025,14 @@ export default function Turnos({ user }) {
                 </tr>
               </thead>
               <tbody>
-                {turnosFiltrados.length === 0 && (
+                {cargandoTurnos && turnosFiltrados.length === 0 && (
+                  <tr>
+                    <td colSpan={puedeAdministrarTurnos ? 10 : 7} style={{ textAlign: "center", color: "#64748B", padding: "32px 0", fontStyle: "italic" }}>
+                      Cargando turnos...
+                    </td>
+                  </tr>
+                )}
+                {!cargandoTurnos && turnosFiltrados.length === 0 && (
                   <tr>
                     <td colSpan={puedeAdministrarTurnos ? 10 : 7} style={{ textAlign: "center", color: "#94A3B8", padding: "32px 0", fontStyle: "italic" }}>
                       No hay turnos para mostrar

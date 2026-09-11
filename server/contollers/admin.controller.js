@@ -174,7 +174,7 @@ async function listarTurnos(req, res) {
 
   let query = supabaseAdmin
     .from("turnos")
-    .select("id, nombre, telefono, servicio, precio, barbero, barbero_id, fecha, hora, estado, created_at")
+    .select("id, nombre, telefono, servicio, precio, barbero, fecha, hora, estado")
     .eq("barberia_id", barberia_id);
 
   if (fecha) {
@@ -200,7 +200,7 @@ async function listarTurnos(req, res) {
     .order("fecha", { ascending: true })
     .order("hora", { ascending: true })
     .limit(limit);
-  if (error) return res.status(500).json({ error });
+  if (error) return res.status(500).json({ error: error.message || "Error listando turnos" });
   res.json(data);
 }
 
