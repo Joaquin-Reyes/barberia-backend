@@ -38,7 +38,7 @@ function fechaISO(date) {
 
 function rangoInicialTurnos() {
   const hoy = new Date();
-  const desde = hoy;
+  const desde = new Date(hoy.getTime() - 30 * MS_DIA);
   const hasta = new Date(hoy.getTime() + 60 * MS_DIA);
   return { desde: fechaISO(desde), hasta: fechaISO(hasta) };
 }
@@ -608,9 +608,16 @@ export default function Turnos({ user }) {
 
   const normHora = (h) => String(h || "").slice(0, 5).replace(/^(\d):/, "0$1:");
   const esMediaHora = (h) => ["00", "30"].includes(normHora(h).split(":")[1]);
-  const compararTurnosPorHorario = (a, b) =>
-    String(a.fecha || "").localeCompare(String(b.fecha || "")) ||
-    normHora(a.hora).localeCompare(normHora(b.hora));
+  const hoy = fechaISO(new Date());
+  const compararTurnosPorHorario = (a, b) => {
+    const fechaA = String(a.fecha || "");
+    const fechaB = String(b.fecha || "");
+    const pasadoA = fechaA < hoy;
+    const pasadoB = fechaB < hoy;
+    if (pasadoA !== pasadoB) return pasadoA ? 1 : -1;
+    const porFecha = pasadoA ? fechaB.localeCompare(fechaA) : fechaA.localeCompare(fechaB);
+    return porFecha || normHora(a.hora).localeCompare(normHora(b.hora));
+  };
 
   const horariosDisponibles = horarios.filter((h) =>
     !turnos.some((t) => t.fecha === nuevo.fecha && t.barbero === nuevo.barbero && normHora(t.hora) === h)
