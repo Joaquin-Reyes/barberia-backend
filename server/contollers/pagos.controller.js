@@ -134,17 +134,23 @@ async function getPagosTurno(req, res) {
   const turno = await getTurnoDeBarberia(req, req.params.turno_id);
   if (!turno) return res.status(404).json({ error: "Turno no encontrado" });
 
-  const { data, error } = await supabaseAdmin
+  const barberiaId = getBarberiaId(req);
+  const pagosQuery = supabaseAdmin
     .from("pagos")
-    .select("*")
-    .eq("barberia_id", getBarberiaId(req))
+    .select("id, turno_id, monto, metodo, tipo, nota, anulado_at, created_at")
+    .eq("barberia_id", barberiaId)
     .eq("turno_id", turno.id)
     .order("created_at", { ascending: true });
 
+  const [pagosResult, productos] = await Promise.all([
+    pagosQuery,
+    getProductosTurno(turno.id, barberiaId),
+  ]);
+
+  const { data, error } = pagosResult;
   if (error) return res.status(500).json({ error: error.message });
 
   const pagos = data || [];
-  const productos = await getProductosTurno(turno.id, getBarberiaId(req));
   const totalProductos = productos.reduce((sum, item) => sum + asMoney(item.subtotal), 0);
   const resumenPago = buildResumenPagoTurno(turno, totalProductos, pagos, {
     legacyCompletados: req.query.legacyCompletados === "1",

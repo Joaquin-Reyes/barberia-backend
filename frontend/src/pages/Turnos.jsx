@@ -76,8 +76,29 @@ function estadoPagoTurno(turno, pagoInfo) {
   return turno?.estado === "completado" ? "pagado" : "sin_pagar";
 }
 
-function PagosPanel({ turno, onChanged, onToast }) {
-  const [data, setData] = useState(null);
+function buildPagoPanelFallback(turno, pagoInfo) {
+  const totalServicio = Number(pagoInfo?.total_servicio ?? turno?.precio ?? 0);
+  const totalProductos = Number(pagoInfo?.total_productos || 0);
+  const totalCobrable = Number(pagoInfo?.total_cobrable ?? totalServicio + totalProductos);
+  const totalPagado = Number(pagoInfo?.total_pagado || 0);
+  const saldo = Number(pagoInfo?.saldo ?? Math.max(totalCobrable - totalPagado, 0));
+
+  return {
+    pagos: [],
+    productos: [],
+    total_servicio: totalServicio,
+    total_productos: totalProductos,
+    total_cobrable: totalCobrable,
+    total_pagado: totalPagado,
+    saldo,
+    estado_pago: pagoInfo?.estado_pago || estadoPagoTurno(turno, pagoInfo),
+    pago_historico: Boolean(pagoInfo?.pago_historico),
+  };
+}
+
+function PagosPanel({ turno, pagoInfo, onChanged, onToast }) {
+  const initialData = buildPagoPanelFallback(turno, pagoInfo);
+  const [data, setData] = useState(initialData);
   const [productos, setProductos] = useState([]);
   const [productoForm, setProductoForm] = useState({ producto_id: "", cantidad: 1 });
   const [form, setForm] = useState({
@@ -109,13 +130,21 @@ function PagosPanel({ turno, onChanged, onToast }) {
     } finally {
       setLoading(false);
     }
-  }, [turno?.id]);
+  }, [turno?.id, turno?.precio]);
 
   useEffect(() => {
-    setData(null);
-    setForm({ monto: "", metodo: "efectivo", tipo: "pago_total", nota: "" });
+    const fallback = buildPagoPanelFallback(turno, pagoInfo);
+    const saldo = Number(fallback?.saldo || 0);
+    const total = Number(fallback?.total_cobrable ?? turno?.precio ?? 0);
+    setData(fallback);
+    setForm({
+      monto: saldo > 0 ? String(saldo) : fallback?.pago_historico && total > 0 ? String(total) : "",
+      metodo: "efectivo",
+      tipo: "pago_total",
+      nota: "",
+    });
     cargar();
-  }, [cargar, turno?.precio]);
+  }, [cargar, pagoInfo, turno]);
 
   useEffect(() => {
     productosApi.list()
@@ -229,6 +258,7 @@ function PagosPanel({ turno, onChanged, onToast }) {
     parcial: "Pago parcial",
     pagado: "Pagado",
   }[data?.estado_pago] || "Sin datos";
+  const cargandoDetalle = loading && data?.pagos?.length === 0 && data?.productos?.length === 0;
 
   return (
     <div className="turno-pagos-panel">
@@ -246,23 +276,23 @@ function PagosPanel({ turno, onChanged, onToast }) {
       <div className="turno-pagos-summary">
         <div>
           <span>Servicio</span>
-          <strong>{loading ? "..." : money(data?.total_servicio ?? turno.precio)}</strong>
+          <strong>{money(data?.total_servicio ?? turno.precio)}</strong>
         </div>
         <div>
           <span>Productos</span>
-          <strong>{loading ? "..." : money(data?.total_productos)}</strong>
+          <strong>{money(data?.total_productos)}</strong>
         </div>
         <div>
           <span>Total</span>
-          <strong>{loading ? "..." : money(data?.total_cobrable ?? turno.precio)}</strong>
+          <strong>{money(data?.total_cobrable ?? turno.precio)}</strong>
         </div>
         <div>
           <span>Pagado</span>
-          <strong>{loading ? "..." : money(data?.total_pagado)}</strong>
+          <strong>{money(data?.total_pagado)}</strong>
         </div>
         <div>
           <span>Saldo</span>
-          <strong>{loading ? "..." : money(data?.saldo)}</strong>
+          <strong>{money(data?.saldo)}</strong>
         </div>
         <div>
           <span>Estado</span>
@@ -311,7 +341,9 @@ function PagosPanel({ turno, onChanged, onToast }) {
           </button>
         </form>
 
-        {productosTurno.length === 0 ? (
+        {cargandoDetalle ? (
+          <p className="turno-productos-empty">Cargando detalle...</p>
+        ) : productosTurno.length === 0 ? (
           <p className="turno-productos-empty">Sin productos agregados.</p>
         ) : (
           <div className="turno-productos-list">
@@ -373,6 +405,8 @@ function PagosPanel({ turno, onChanged, onToast }) {
       <div className="turno-pagos-list">
         {activos.length === 0 ? (
           <p>No hay pagos registrados.</p>
+        ) : cargandoDetalle ? (
+          <p style={{ margin: 0, color: "#64748B", fontSize: 13 }}>Cargando detalle...</p>
         ) : activos.map((pago) => (
           <div className="turno-pago-row" key={pago.id}>
             <span>
@@ -997,6 +1031,7 @@ export default function Turnos({ user }) {
                   {puedeAdministrarTurnos && pagoAbierto && (
                     <PagosPanel
                       turno={t}
+                      pagoInfo={pagoInfo}
                       onChanged={() => {
                         traerTurnos();
                       }}
@@ -1243,6 +1278,7 @@ export default function Turnos({ user }) {
                         <td colSpan={10} style={{ padding: 0, background: "#F8FAFC" }}>
                           <PagosPanel
                             turno={t}
+                            pagoInfo={pagoInfo}
                             onChanged={() => {
                               traerTurnos();
                             }}
