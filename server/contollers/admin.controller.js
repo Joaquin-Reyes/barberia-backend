@@ -371,7 +371,7 @@ async function actualizarEstadoTurno(req, res) {
     horaFinal !== formatearHora(turnoActual.hora) ||
     barberoFinal !== turnoActual.barbero;
 
-  if (barberoFinal && fechaFinal && horaFinal) {
+  if (cambioAgenda && barberoFinal && fechaFinal && horaFinal) {
     const { data: turnosMismoHorario, error: errorOcupado } = await supabaseAdmin
       .from("turnos")
       .select("id")

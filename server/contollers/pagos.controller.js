@@ -186,23 +186,26 @@ async function listTurnosParaCobrar(req, res) {
   const pagosPorTurno = new Map();
   const productosPorTurno = new Map();
   if (ids.length) {
-    const { data: pagos, error: pagosError } = await supabaseAdmin
+    const [pagosResult, productosResult] = await Promise.all([
+      supabaseAdmin
       .from("pagos")
       .select("turno_id, monto")
       .eq("barberia_id", getBarberiaId(req))
       .in("turno_id", ids)
-      .is("anulado_at", null);
+      .is("anulado_at", null),
+      supabaseAdmin
+      .from("turno_productos")
+      .select("turno_id, subtotal")
+      .eq("barberia_id", getBarberiaId(req))
+      .in("turno_id", ids),
+    ]);
 
+    const { data: pagos, error: pagosError } = pagosResult;
+    const { data: productos, error: productosError } = productosResult;
     if (pagosError) return res.status(500).json({ error: pagosError.message });
     for (const pago of pagos || []) {
       pagosPorTurno.set(pago.turno_id, (pagosPorTurno.get(pago.turno_id) || 0) + asMoney(pago.monto));
     }
-
-    const { data: productos, error: productosError } = await supabaseAdmin
-      .from("turno_productos")
-      .select("turno_id, subtotal")
-      .eq("barberia_id", getBarberiaId(req))
-      .in("turno_id", ids);
 
     if (productosError) return res.status(500).json({ error: productosError.message });
     for (const item of productos || []) {

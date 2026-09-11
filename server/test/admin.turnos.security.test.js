@@ -422,6 +422,30 @@ test("admin de Barberia A modifica turnos de cualquier barbero de Barberia A", a
   assert.equal(db.turnos[0].estado, "confirmado");
 });
 
+test("confirmar evita releer disponibilidad; reprogramar rechaza horario ocupado", async () => {
+  const { db, calls } = createSupabaseMock({
+    turnos: [
+      { id: "a", barberia_id: "local", barbero: "Juan", fecha: "2026-09-11", hora: "10:00", estado: "pendiente" },
+      { id: "b", barberia_id: "local", barbero: "Juan", fecha: "2026-09-11", hora: "11:00", estado: "pendiente" },
+    ],
+  });
+  const user = { id: "admin", rol: "admin", barberia_id: "local" };
+  const confirmacion = createRes();
+  await adminController.actualizarEstadoTurno(authReq(user, {
+    params: { id: "a" }, body: { estado: "confirmado" },
+  }), confirmacion);
+  assert.equal(confirmacion.statusCode, 200);
+  assert.equal(db.turnos[0].estado, "confirmado");
+  assert.equal(calls.filter((call) => call.action === "select").length, 1);
+
+  const reprogramacion = createRes();
+  await adminController.actualizarEstadoTurno(authReq(user, {
+    params: { id: "a" }, body: { hora: "11:00" },
+  }), reprogramacion);
+  assert.equal(reprogramacion.statusCode, 400);
+  assert.equal(db.turnos[0].hora, "10:00");
+});
+
 test("barbero solo puede establecer estado completado", async () => {
   const { db } = createSupabaseMock({
     barberos: [

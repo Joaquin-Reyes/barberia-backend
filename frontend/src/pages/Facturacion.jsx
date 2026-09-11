@@ -583,8 +583,8 @@ export default function Facturacion({ user }) {
     try {
       await pagosApi.create(pagoForm)
       setPagoForm({ turno_id: '', monto: '', metodo: 'efectivo', tipo: 'pago_total', nota: '' })
-      await cargar()
       setVista('caja')
+      void cargar()
     } catch (err) {
       setError(err.message)
     } finally {

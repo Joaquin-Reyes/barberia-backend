@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Check, Plus, Search, Pencil, X, WalletCards, Trash2 } from "lucide-react";
 import { supabase, turnoDisponible, getAuthToken } from "../lib/supabase";
 import { pagos as pagosApi, productos as productosApi, turnos as turnosApi } from "../lib/api";
@@ -427,6 +427,7 @@ export default function Turnos({ user }) {
   const barberiaId = user?.barberia_id;
   const rolUsuario = user?.rol;
   const [turnos, setTurnos] = useState([]);
+  const cambiosEstadoEnCurso = useRef(new Set());
   const [barberos, setBarberos] = useState([]);
   const [servicios, setServicios] = useState([]);
   const [horarios, setHorarios] = useState([]);
@@ -624,16 +625,25 @@ export default function Turnos({ user }) {
   );
 
   async function cambiarEstado(id, nuevoEstado) {
+    if (cambiosEstadoEnCurso.current.has(id)) return;
+    cambiosEstadoEnCurso.current.add(id);
     try {
       const token = await getAuthToken();
-      await fetch(`${API}/admin/turnos/${id}`, {
+      const res = await fetch(`${API}/admin/turnos/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ estado: nuevoEstado }),
       });
-      traerTurnos();
+      const data = await res.json();
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "No se pudo actualizar el turno");
+      setTurnos((actuales) => actuales.map((turno) => turno.id === id ? { ...turno, estado: nuevoEstado } : turno));
+      if (nuevoEstado === "completado" || turnos.find((turno) => turno.id === id)?.estado === "completado") {
+        cargarEstadosPago(turnos);
+      }
     } catch (error) {
-      console.error("ERROR:", error);
+      mostrarToast(error.message, "error");
+    } finally {
+      cambiosEstadoEnCurso.current.delete(id);
     }
   }
 
