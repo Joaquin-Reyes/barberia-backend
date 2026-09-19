@@ -72,7 +72,79 @@ function createPerfLogger(res, operation, endpoint) {
         log(label, elapsedMs(stepStartedAt));
       }
     },
+    event(label, value) {
+      try {
+        console.log(`[PERF] id=${id} ${operation} ${label}=${value}`);
+      } catch {}
+    },
   };
+}
+
+function iniciarNotificacionesTurno({
+  perf,
+  nombre,
+  telefono,
+  servicio,
+  precio,
+  barbero,
+  telefonoBarbero,
+  fecha,
+  hora,
+  horaNormalizada,
+  barberia_id,
+}) {
+  const ejecutar = async () => {
+    const tareas = [];
+
+    if (barbero) {
+      tareas.push({
+        nombre: "whatsappBarbero",
+        promesa: perf.measure("whatsappBarbero", () => notificarBarbero({
+          nombre,
+          servicio,
+          barbero,
+          fecha,
+          hora,
+          telefono: telefonoBarbero,
+          barberia_id,
+        })),
+      });
+    }
+
+    if (telefono) {
+      const [y, m, d] = String(fecha).split("-");
+      tareas.push({
+        nombre: "whatsappCliente",
+        promesa: perf.measure("whatsappCliente", () => enviarTemplateConfirmacion({
+          telefono,
+          servicio,
+          barbero,
+          fecha: `${d}/${m}/${y}`,
+          horario: String(horaNormalizada).slice(0, 5),
+          precio,
+          barberia_id,
+        })),
+      });
+    }
+
+    const resultados = await Promise.allSettled(tareas.map((tarea) => tarea.promesa));
+    resultados.forEach((resultado, index) => {
+      const tarea = tareas[index];
+      perf.event(`${tarea.nombre}Status`, resultado.status);
+      if (resultado.status === "rejected") {
+        try {
+          console.error(`[PERF] ${tarea.nombre} rechazado:`, resultado.reason?.message || resultado.reason);
+        } catch {}
+      }
+    });
+  };
+
+  void perf.measure("notificacionesTotal", ejecutar).catch((error) => {
+    perf.event("notificacionesStatus", "rejected");
+    try {
+      console.error("[PERF] Error inesperado procesando notificaciones:", error?.message || error);
+    } catch {}
+  });
 }
 
 function isWhatsappDirectChatId(chatId) {
@@ -112,7 +184,7 @@ async function crearTurno(req, res) {
         "validarBarbero",
         () => supabaseAdmin
           .from("barberos")
-          .select("id")
+          .select("id, telefono, nombre")
           .ilike("nombre", barbero)
           .eq("barberia_id", barberia_id)
           .maybeSingle(),
@@ -188,54 +260,28 @@ async function crearTurno(req, res) {
       return res.status(500).json({ error: "Error guardando" });
     }
 
-    if (barbero) {
-      const { data: barberoData, error: errorBarbero } = await perf.measure(
-        "datosBarberoWhatsapp",
-        () => supabaseAdmin
-          .from("barberos")
-          .select("telefono, nombre")
-          .ilike("nombre", barbero)
-          .eq("barberia_id", barberia_id)
-          .maybeSingle(),
-        1
-      );
-
-      console.log("📱 Telefono barbero encontrado:", barberoData?.telefono);
-
-      if (errorBarbero) {
-        console.log("❌ Error obteniendo barbero:", errorBarbero);
-      }
-
-      await perf.measure("whatsappBarbero", () => notificarBarbero({
-          nombre,
-          servicio,
-          barbero,
-          fecha,
-          hora,
-          telefono: barberoData?.telefono,
-          barberia_id
-        }));
-    }
-
-    if (telefono) {
-      try {
-        const [y, m, d] = String(fecha).split("-");
-        await perf.measure("whatsappCliente", () => enviarTemplateConfirmacion({
-            telefono,
-            servicio,
-            barbero,
-            fecha: `${d}/${m}/${y}`,
-            horario: String(horaNormalizada).slice(0, 5),
-            precio: precio || 0,
-            barberia_id
-          }));
-        console.log("✅ Template confirmacion enviado al cliente:", telefono);
-      } catch (errTemplate) {
-        console.error("❌ Error enviando template al cliente:", errTemplate.response?.data || errTemplate.message);
-      }
-    }
-
     res.json({ ok: true });
+
+    try {
+      iniciarNotificacionesTurno({
+        perf,
+        nombre,
+        telefono,
+        servicio,
+        precio: precio || 0,
+        barbero,
+        telefonoBarbero: barberoValidado?.telefono,
+        fecha,
+        hora,
+        horaNormalizada,
+        barberia_id,
+      });
+    } catch (errorNotificaciones) {
+      perf.event("notificacionesStatus", "rejected");
+      try {
+        console.error("[PERF] No se pudieron iniciar las notificaciones:", errorNotificaciones?.message || errorNotificaciones);
+      } catch {}
+    }
 
   } catch (err) {
     console.log("❌ Error general:", err);
