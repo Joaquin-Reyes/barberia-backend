@@ -1,8 +1,83 @@
 const { supabaseAdmin } = require("../config/supabase");
+const { randomBytes } = require("node:crypto");
 const { businessDate, businessDateRangeUtc, isDateString } = require("../utils/business-time");
 
 const METODOS = ["efectivo", "transferencia", "mercado_pago", "tarjeta", "otro"];
 const TIPOS = ["sena", "pago_total", "parcial", "ajuste"];
+
+function createPerfLogger(res, operation, endpoint) {
+  let id = "unknown";
+  let startedAt = null;
+  let queries = 0;
+
+  try {
+    id = randomBytes(2).toString("hex");
+  } catch {}
+
+  try {
+    startedAt = process.hrtime.bigint();
+  } catch {}
+
+  const elapsedMs = (since) => {
+    try {
+      if (since === null) return null;
+      const duration = Number(process.hrtime.bigint() - since) / 1e6;
+      return Number.isFinite(duration) ? duration : null;
+    } catch {
+      return null;
+    }
+  };
+  const formatMs = (duration) => {
+    try {
+      return duration === null ? "unknown" : duration.toFixed(1);
+    } catch {
+      return "unknown";
+    }
+  };
+  const log = (label, duration) => {
+    try {
+      console.log(`[PERF] id=${id} ${operation} ${label}=${formatMs(duration)}ms`);
+    } catch {}
+  };
+
+  try {
+    if (typeof res.once === "function") {
+      res.once("finish", () => {
+        try {
+          console.log(
+            `[PERF] id=${id} ${operation} endpoint=${endpoint} total=${formatMs(elapsedMs(startedAt))}ms queries=${queries}`
+          );
+        } catch {}
+      });
+    }
+  } catch {}
+
+  return {
+    async measure(label, work, queryCount = 0) {
+      let stepStartedAt = null;
+      try {
+        stepStartedAt = process.hrtime.bigint();
+        queries += queryCount;
+      } catch {}
+      try {
+        return await work();
+      } finally {
+        log(label, elapsedMs(stepStartedAt));
+      }
+    },
+    measureSync(label, work) {
+      let stepStartedAt = null;
+      try {
+        stepStartedAt = process.hrtime.bigint();
+      } catch {}
+      try {
+        return work();
+      } finally {
+        log(label, elapsedMs(stepStartedAt));
+      }
+    },
+  };
+}
 
 function parseDate(value) {
   return isDateString(value) ? value : null;
@@ -164,6 +239,7 @@ async function getPagosTurno(req, res) {
 }
 
 async function listTurnosParaCobrar(req, res) {
+  const perf = createPerfLogger(res, "estadosPagoTurnos", "GET /api/pagos/turnos");
   const { desde, hasta } = dateRangeFromQuery(req.query);
   if (desde > hasta) return res.status(400).json({ error: "La fecha desde no puede ser mayor a la fecha hasta" });
 
@@ -178,7 +254,7 @@ async function listTurnosParaCobrar(req, res) {
 
   if (req.query.todos !== "1") query = query.eq("estado", "completado");
 
-  const { data, error } = await query;
+  const { data, error } = await perf.measure("turnos", () => query, 1);
 
   if (error) return res.status(500).json({ error: error.message });
 
@@ -187,17 +263,17 @@ async function listTurnosParaCobrar(req, res) {
   const productosPorTurno = new Map();
   if (ids.length) {
     const [pagosResult, productosResult] = await Promise.all([
-      supabaseAdmin
-      .from("pagos")
-      .select("turno_id, monto")
-      .eq("barberia_id", getBarberiaId(req))
-      .in("turno_id", ids)
-      .is("anulado_at", null),
-      supabaseAdmin
-      .from("turno_productos")
-      .select("turno_id, subtotal")
-      .eq("barberia_id", getBarberiaId(req))
-      .in("turno_id", ids),
+      perf.measure("pagos", () => supabaseAdmin
+        .from("pagos")
+        .select("turno_id, monto")
+        .eq("barberia_id", getBarberiaId(req))
+        .in("turno_id", ids)
+        .is("anulado_at", null), 1),
+      perf.measure("productos", () => supabaseAdmin
+        .from("turno_productos")
+        .select("turno_id, subtotal")
+        .eq("barberia_id", getBarberiaId(req))
+        .in("turno_id", ids), 1),
     ]);
 
     const { data: pagos, error: pagosError } = pagosResult;
@@ -213,22 +289,25 @@ async function listTurnosParaCobrar(req, res) {
     }
   }
 
-  res.json((data || []).map((turno) => {
-    const totalProductos = productosPorTurno.get(turno.id) || 0;
-    const totalPagado = pagosPorTurno.get(turno.id) || 0;
-    const pagos = totalPagado > 0 ? [{ monto: totalPagado }] : [];
-    const resumenPago = buildResumenPagoTurno(turno, totalProductos, pagos, {
-      legacyCompletados: req.query.legacyCompletados === "1",
-    });
+  const resultado = perf.measureSync("armarResumen", () => (data || []).map((turno) => {
+      const totalProductos = productosPorTurno.get(turno.id) || 0;
+      const totalPagado = pagosPorTurno.get(turno.id) || 0;
+      const pagos = totalPagado > 0 ? [{ monto: totalPagado }] : [];
+      const resumenPago = buildResumenPagoTurno(turno, totalProductos, pagos, {
+        legacyCompletados: req.query.legacyCompletados === "1",
+      });
 
-    return {
-      ...turno,
-      ...resumenPago,
-    };
-  }));
+      return {
+        ...turno,
+        ...resumenPago,
+      };
+    }));
+
+  res.json(resultado);
 }
 
 async function createPago(req, res) {
+  const perf = createPerfLogger(res, "registrarPago", "POST /api/pagos");
   const { turno_id, monto, metodo = "efectivo", tipo = "pago_total", nota } = req.body;
 
   if (!turno_id) return res.status(400).json({ error: "turno_id es requerido" });
@@ -238,30 +317,34 @@ async function createPago(req, res) {
   if (!METODOS.includes(metodo)) return res.status(400).json({ error: "metodo invalido" });
   if (!TIPOS.includes(tipo)) return res.status(400).json({ error: "tipo invalido" });
 
-  const turno = await getTurnoDeBarberia(req, turno_id);
+  const turno = await perf.measure("buscarTurno", () => getTurnoDeBarberia(req, turno_id), 1);
   if (!turno) return res.status(404).json({ error: "Turno no encontrado" });
 
   const fechaPago = businessDate();
-  if (await tieneCierreCaja(getBarberiaId(req), fechaPago)) {
+  if (await perf.measure("validarCierreCaja", () => tieneCierreCaja(getBarberiaId(req), fechaPago), 1)) {
     return res.status(409).json({ error: "La caja de hoy ya está cerrada. Anulá el cierre antes de registrar otro pago." });
   }
 
-  const { data, error } = await supabaseAdmin
-    .from("pagos")
-    .insert({
-      barberia_id: getBarberiaId(req),
-      turno_id: turno.id,
-      cliente_nombre: turno.nombre || null,
-      servicio: turno.servicio || null,
-      barbero: turno.barbero || null,
-      monto: Number(monto),
-      metodo,
-      tipo,
-      nota: nota?.trim() || null,
-      creado_por: req.user.id,
-    })
-    .select()
-    .single();
+  const { data, error } = await perf.measure(
+    "insert",
+    () => supabaseAdmin
+      .from("pagos")
+      .insert({
+        barberia_id: getBarberiaId(req),
+        turno_id: turno.id,
+        cliente_nombre: turno.nombre || null,
+        servicio: turno.servicio || null,
+        barbero: turno.barbero || null,
+        monto: Number(monto),
+        metodo,
+        tipo,
+        nota: nota?.trim() || null,
+        creado_por: req.user.id,
+      })
+      .select()
+      .single(),
+    1
+  );
 
   if (error) return res.status(500).json({ error: error.message });
   res.status(201).json(data);
@@ -402,17 +485,20 @@ async function anularPago(req, res) {
   res.json(data);
 }
 
-async function buildResumenCaja(req, desde, hasta) {
+async function buildResumenCaja(req, desde, hasta, perf = null) {
   const range = businessDateRangeUtc(desde, hasta);
 
-  const { data, error } = await supabaseAdmin
-    .from("pagos")
-    .select("id, monto, metodo, tipo, created_at, cliente_nombre, servicio, barbero, turno_id")
-    .eq("barberia_id", getBarberiaId(req))
-    .is("anulado_at", null)
-    .gte("created_at", range.start)
-    .lt("created_at", range.endExclusive)
-    .order("created_at", { ascending: true });
+  const pagosQuery = () => supabaseAdmin
+      .from("pagos")
+      .select("id, monto, metodo, tipo, created_at, cliente_nombre, servicio, barbero, turno_id")
+      .eq("barberia_id", getBarberiaId(req))
+      .is("anulado_at", null)
+      .gte("created_at", range.start)
+      .lt("created_at", range.endExclusive)
+      .order("created_at", { ascending: true });
+  const { data, error } = perf
+    ? await perf.measure("pagos", pagosQuery, 1)
+    : await pagosQuery();
 
   if (error) return { error };
 
@@ -424,25 +510,40 @@ async function buildResumenCaja(req, desde, hasta) {
   const porDia = new Map();
   let total = 0;
 
-  for (const pago of data || []) {
-    const amount = asMoney(pago.monto);
-    total += amount;
-    addToGroup(porMetodo, pago.metodo || "otro", pago.metodo || "otro", amount);
-    addToGroup(porTipo, pago.tipo || "pago_total", pago.tipo || "pago_total", amount);
-    addToGroup(porBarbero, pago.barbero || "sin_barbero", pago.barbero || "Sin barbero", amount);
-    addToGroup(porServicio, pago.servicio || "sin_servicio", pago.servicio || "Sin servicio", amount);
-    const dia = businessDate(pago.created_at) || "sin_fecha";
-    addToGroup(porDia, dia, dia, amount);
-  }
+  const agruparPagos = () => {
+    for (const pago of data || []) {
+      const amount = asMoney(pago.monto);
+      total += amount;
+      addToGroup(porMetodo, pago.metodo || "otro", pago.metodo || "otro", amount);
+      addToGroup(porTipo, pago.tipo || "pago_total", pago.tipo || "pago_total", amount);
+      addToGroup(porBarbero, pago.barbero || "sin_barbero", pago.barbero || "Sin barbero", amount);
+      addToGroup(porServicio, pago.servicio || "sin_servicio", pago.servicio || "Sin servicio", amount);
+      const dia = businessDate(pago.created_at) || "sin_fecha";
+      addToGroup(porDia, dia, dia, amount);
+    }
+  };
+  if (perf) perf.measureSync("agruparPagos", agruparPagos);
+  else agruparPagos();
 
   let totalProductos = 0;
   try {
-    const productos = await getProductosPorTurnos(getBarberiaId(req), (data || []).map((pago) => pago.turno_id));
-    for (const item of productos) {
-      const amount = asMoney(item.subtotal);
-      totalProductos += amount;
-      addToGroup(porProducto, item.producto_id || item.nombre || "sin_producto", item.nombre || "Sin producto", amount);
-    }
+    const productosQuery = () => getProductosPorTurnos(
+      getBarberiaId(req),
+      (data || []).map((pago) => pago.turno_id)
+    );
+    const productoIds = (data || []).map((pago) => pago.turno_id).filter(Boolean);
+    const productos = perf
+      ? await perf.measure("productos", productosQuery, productoIds.length ? 1 : 0)
+      : await productosQuery();
+    const agruparProductos = () => {
+      for (const item of productos) {
+        const amount = asMoney(item.subtotal);
+        totalProductos += amount;
+        addToGroup(porProducto, item.producto_id || item.nombre || "sin_producto", item.nombre || "Sin producto", amount);
+      }
+    };
+    if (perf) perf.measureSync("agruparProductos", agruparProductos);
+    else agruparProductos();
   } catch {
     totalProductos = 0;
   }
@@ -468,10 +569,11 @@ async function buildResumenCaja(req, desde, hasta) {
 }
 
 async function getResumenCaja(req, res) {
+  const perf = createPerfLogger(res, "resumenCaja", "GET /api/pagos/caja/resumen");
   const { desde, hasta } = dateRangeFromQuery(req.query);
   if (desde > hasta) return res.status(400).json({ error: "La fecha desde no puede ser mayor a la fecha hasta" });
 
-  const { resumen, error } = await buildResumenCaja(req, desde, hasta);
+  const { resumen, error } = await buildResumenCaja(req, desde, hasta, perf);
   if (error) return res.status(500).json({ error: error.message });
   res.json(resumen);
 }

@@ -1,4 +1,5 @@
 const { supabaseAdmin } = require("../config/supabase");
+const { randomBytes } = require("node:crypto");
 const { metadataMatchesBarbero } = require("./auth.controller");
 const { notificarBarbero, enviarTemplateConfirmacion } = require("../services/whatsapp.service");
 const { formatearHora, obtenerHorariosDisponibles } = require("../services/agenda.service");
@@ -10,6 +11,69 @@ const ESTADOS_TURNO = ["pendiente", "confirmado", "completado", "cancelado"];
 const METODOS_PAGO = ["efectivo", "transferencia", "mercado_pago", "tarjeta", "otro"];
 const CAMPOS_TURNO_ADMIN = ["nombre", "telefono", "servicio", "precio", "barbero", "fecha", "hora", "estado"];
 const CAMPOS_PROHIBIDOS_TURNO = ["id", "barberia_id", "barbero_id", "created_at", "updated_at", "usuario_id"];
+
+function createPerfLogger(res, operation, endpoint) {
+  let id = "unknown";
+  let startedAt = null;
+  let queries = 0;
+
+  try {
+    id = randomBytes(2).toString("hex");
+  } catch {}
+
+  try {
+    startedAt = process.hrtime.bigint();
+  } catch {}
+
+  const elapsedMs = (since) => {
+    try {
+      if (since === null) return null;
+      const duration = Number(process.hrtime.bigint() - since) / 1e6;
+      return Number.isFinite(duration) ? duration : null;
+    } catch {
+      return null;
+    }
+  };
+  const formatMs = (duration) => {
+    try {
+      return duration === null ? "unknown" : duration.toFixed(1);
+    } catch {
+      return "unknown";
+    }
+  };
+  const log = (label, duration) => {
+    try {
+      console.log(`[PERF] id=${id} ${operation} ${label}=${formatMs(duration)}ms`);
+    } catch {}
+  };
+
+  try {
+    if (typeof res.once === "function") {
+      res.once("finish", () => {
+        try {
+          console.log(
+            `[PERF] id=${id} ${operation} endpoint=${endpoint} total=${formatMs(elapsedMs(startedAt))}ms queries=${queries}`
+          );
+        } catch {}
+      });
+    }
+  } catch {}
+
+  return {
+    async measure(label, work, queryCount = 0) {
+      let stepStartedAt = null;
+      try {
+        stepStartedAt = process.hrtime.bigint();
+        queries += queryCount;
+      } catch {}
+      try {
+        return await work();
+      } finally {
+        log(label, elapsedMs(stepStartedAt));
+      }
+    },
+  };
+}
 
 function isWhatsappDirectChatId(chatId) {
   if (!chatId) return false;
@@ -28,6 +92,7 @@ function esHoraValidaTurno(value) {
 }
 
 async function crearTurno(req, res) {
+  const perf = createPerfLogger(res, "crearTurno", "POST /admin/crear-turno");
   const { nombre, telefono, servicio, precio, barbero, fecha, hora } = req.body;
 
   console.log("🧪 Endpoint ADMIN crear turno");
@@ -43,12 +108,16 @@ async function crearTurno(req, res) {
   try {
     let barberoValidado = null;
     if (barbero) {
-      const { data: barberoExiste, error: errorBarberoExiste } = await supabaseAdmin
-        .from("barberos")
-        .select("id")
-        .ilike("nombre", barbero)
-        .eq("barberia_id", barberia_id)
-        .maybeSingle();
+      const { data: barberoExiste, error: errorBarberoExiste } = await perf.measure(
+        "validarBarbero",
+        () => supabaseAdmin
+          .from("barberos")
+          .select("id")
+          .ilike("nombre", barbero)
+          .eq("barberia_id", barberia_id)
+          .maybeSingle(),
+        1
+      );
 
       if (errorBarberoExiste) {
         console.log("❌ Error validando barbero:", errorBarberoExiste);
@@ -62,13 +131,17 @@ async function crearTurno(req, res) {
       barberoValidado = barberoExiste;
     }
 
-    const { data: turnosExistentes, error: errorBusqueda } = await supabaseAdmin
-      .from("turnos")
-      .select("*")
-      .eq("hora", horaNormalizada)
-      .eq("barbero", barbero)
-      .eq("fecha", fecha)
-      .eq("barberia_id", barberia_id);
+    const { data: turnosExistentes, error: errorBusqueda } = await perf.measure(
+      "disponibilidad",
+      () => supabaseAdmin
+        .from("turnos")
+        .select("*")
+        .eq("hora", horaNormalizada)
+        .eq("barbero", barbero)
+        .eq("fecha", fecha)
+        .eq("barberia_id", barberia_id),
+      1
+    );
 
     if (errorBusqueda) {
       console.log("❌ Error verificando turnos:", errorBusqueda);
@@ -93,13 +166,21 @@ async function crearTurno(req, res) {
       recordatorio_3h: false
     };
 
-    let { error: errorInsert } = await supabaseAdmin.from("turnos").insert([turnoInsert]);
+    let { error: errorInsert } = await perf.measure(
+      "insert",
+      () => supabaseAdmin.from("turnos").insert([turnoInsert]),
+      1
+    );
 
     if (isMissingColumnError(errorInsert, "barbero_id")) {
       console.log("⚠️ turnos.barbero_id no existe en DB; reintentando alta sin barbero_id");
-      ({ error: errorInsert } = await supabaseAdmin
-        .from("turnos")
-        .insert([withoutField(turnoInsert, "barbero_id")]));
+      ({ error: errorInsert } = await perf.measure(
+        "insertSinBarberoId",
+        () => supabaseAdmin
+          .from("turnos")
+          .insert([withoutField(turnoInsert, "barbero_id")]),
+        1
+      ));
     }
 
     if (errorInsert) {
@@ -108,12 +189,16 @@ async function crearTurno(req, res) {
     }
 
     if (barbero) {
-      const { data: barberoData, error: errorBarbero } = await supabaseAdmin
-        .from("barberos")
-        .select("telefono, nombre")
-        .ilike("nombre", barbero)
-        .eq("barberia_id", barberia_id)
-        .maybeSingle();
+      const { data: barberoData, error: errorBarbero } = await perf.measure(
+        "datosBarberoWhatsapp",
+        () => supabaseAdmin
+          .from("barberos")
+          .select("telefono, nombre")
+          .ilike("nombre", barbero)
+          .eq("barberia_id", barberia_id)
+          .maybeSingle(),
+        1
+      );
 
       console.log("📱 Telefono barbero encontrado:", barberoData?.telefono);
 
@@ -121,29 +206,29 @@ async function crearTurno(req, res) {
         console.log("❌ Error obteniendo barbero:", errorBarbero);
       }
 
-      await notificarBarbero({
-        nombre,
-        servicio,
-        barbero,
-        fecha,
-        hora,
-        telefono: barberoData?.telefono,
-        barberia_id
-      });
+      await perf.measure("whatsappBarbero", () => notificarBarbero({
+          nombre,
+          servicio,
+          barbero,
+          fecha,
+          hora,
+          telefono: barberoData?.telefono,
+          barberia_id
+        }));
     }
 
     if (telefono) {
       try {
         const [y, m, d] = String(fecha).split("-");
-        await enviarTemplateConfirmacion({
-          telefono,
-          servicio,
-          barbero,
-          fecha: `${d}/${m}/${y}`,
-          horario: String(horaNormalizada).slice(0, 5),
-          precio: precio || 0,
-          barberia_id
-        });
+        await perf.measure("whatsappCliente", () => enviarTemplateConfirmacion({
+            telefono,
+            servicio,
+            barbero,
+            fecha: `${d}/${m}/${y}`,
+            horario: String(horaNormalizada).slice(0, 5),
+            precio: precio || 0,
+            barberia_id
+          }));
         console.log("✅ Template confirmacion enviado al cliente:", telefono);
       } catch (errTemplate) {
         console.error("❌ Error enviando template al cliente:", errTemplate.response?.data || errTemplate.message);
@@ -209,6 +294,13 @@ async function actualizarEstadoTurno(req, res) {
   const body = req.body || {};
   const { estado } = body;
   const barberia_id = req.user.barberia_id;
+  const camposEdicion = Object.keys(body).filter((campo) => !["estado", "metodo_pago"].includes(campo));
+  const operation = estado === "confirmado" && camposEdicion.length === 0
+    ? "confirmarTurno"
+    : camposEdicion.length > 0
+      ? "editarTurno"
+      : "actualizarTurno";
+  const perf = createPerfLogger(res, operation, "PUT /admin/turnos/:id");
 
   if (CAMPOS_PROHIBIDOS_TURNO.some((campo) => Object.prototype.hasOwnProperty.call(body, campo))) {
     return res.status(400).json({ error: "Campo no permitido" });
@@ -237,23 +329,31 @@ async function actualizarEstadoTurno(req, res) {
       return res.status(400).json({ error: "Metodo de pago invalido" });
     }
 
-    const { data: barbero, error: barberoError } = await supabaseAdmin
-      .from("barberos")
-      .select("nombre")
-      .eq("usuario_id", req.user.id)
-      .eq("barberia_id", barberia_id)
-      .maybeSingle();
+    const { data: barbero, error: barberoError } = await perf.measure(
+      "validarPermisosBarbero",
+      () => supabaseAdmin
+        .from("barberos")
+        .select("nombre")
+        .eq("usuario_id", req.user.id)
+        .eq("barberia_id", barberia_id)
+        .maybeSingle(),
+      1
+    );
 
     if (barberoError) return res.status(500).json({ error: "Error validando permisos" });
     if (!barbero) return res.json({ ok: true });
 
-    const { data: turnoBarbero, error: turnoBarberoError } = await supabaseAdmin
-      .from("turnos")
-      .select("id, nombre, servicio, barbero, precio")
-      .eq("id", id)
-      .eq("barberia_id", barberia_id)
-      .eq("barbero", barbero.nombre)
-      .maybeSingle();
+    const { data: turnoBarbero, error: turnoBarberoError } = await perf.measure(
+      "buscarTurno",
+      () => supabaseAdmin
+        .from("turnos")
+        .select("id, nombre, servicio, barbero, precio")
+        .eq("id", id)
+        .eq("barberia_id", barberia_id)
+        .eq("barbero", barbero.nombre)
+        .maybeSingle(),
+      1
+    );
 
     if (turnoBarberoError) return res.status(500).json({ error: "Error buscando turno" });
     if (!turnoBarbero) return res.json({ ok: true });
@@ -271,44 +371,52 @@ async function actualizarEstadoTurno(req, res) {
     }
 
     const turnoFacturado = { ...turnoBarbero, ...cambiosBarbero };
-    const validacionPago = await validarPagoTurno({
-      barberia_id,
-      turno_id: turnoFacturado.id,
-      monto: turnoFacturado.precio,
-      metodo: metodoPago,
-    });
+    const validacionPago = await perf.measure("validarPago", () => validarPagoTurno({
+        barberia_id,
+        turno_id: turnoFacturado.id,
+        monto: turnoFacturado.precio,
+        metodo: metodoPago,
+      }), 2);
 
     if (!validacionPago.ok) {
       return res.status(validacionPago.status || 500).json({ error: validacionPago.error });
     }
 
-    const { error } = await supabaseAdmin
-      .from("turnos")
-      .update(cambiosBarbero)
-      .eq("id", id)
-      .eq("barberia_id", barberia_id)
-      .eq("barbero", barbero.nombre);
+    const { error } = await perf.measure(
+      "update",
+      () => supabaseAdmin
+        .from("turnos")
+        .update(cambiosBarbero)
+        .eq("id", id)
+        .eq("barberia_id", barberia_id)
+        .eq("barbero", barbero.nombre),
+      1
+    );
 
     if (error) return res.status(500).json({ error });
 
-    const pagoResult = await registrarPagoTurno({
-      barberia_id,
-      turno: turnoFacturado,
-      monto: turnoFacturado.precio,
-      metodo: metodoPago,
-      creado_por: req.user.id,
-    });
+    const pagoResult = await perf.measure("registrarPago", () => registrarPagoTurno({
+        barberia_id,
+        turno: turnoFacturado,
+        monto: turnoFacturado.precio,
+        metodo: metodoPago,
+        creado_por: req.user.id,
+      }), 3);
 
     if (pagoResult.error) return res.status(pagoResult.status || 500).json({ error: pagoResult.error });
     return res.json({ ok: true, pago_creado: Boolean(pagoResult.created) });
   }
 
-  const { data: turnoActual, error: errorTurnoActual } = await supabaseAdmin
-    .from("turnos")
-    .select("*")
-    .eq("id", id)
-    .eq("barberia_id", barberia_id)
-    .maybeSingle();
+  const { data: turnoActual, error: errorTurnoActual } = await perf.measure(
+    "buscarTurno",
+    () => supabaseAdmin
+      .from("turnos")
+      .select("*")
+      .eq("id", id)
+      .eq("barberia_id", barberia_id)
+      .maybeSingle(),
+    1
+  );
 
   if (errorTurnoActual) return res.status(500).json({ error: "Error buscando turno" });
   if (!turnoActual) return res.json({ ok: true });
@@ -349,12 +457,16 @@ async function actualizarEstadoTurno(req, res) {
   }
 
   if (Object.prototype.hasOwnProperty.call(cambios, "barbero") && cambios.barbero) {
-    const { data: barberoExiste, error: errorBarberoExiste } = await supabaseAdmin
-      .from("barberos")
-      .select("id")
-      .ilike("nombre", cambios.barbero)
-      .eq("barberia_id", barberia_id)
-      .maybeSingle();
+    const { data: barberoExiste, error: errorBarberoExiste } = await perf.measure(
+      "validarBarbero",
+      () => supabaseAdmin
+        .from("barberos")
+        .select("id")
+        .ilike("nombre", cambios.barbero)
+        .eq("barberia_id", barberia_id)
+        .maybeSingle(),
+      1
+    );
 
     if (errorBarberoExiste) return res.status(500).json({ error: "Error validando barbero" });
     if (!barberoExiste) return res.status(400).json({ error: "Barbero no encontrado" });
@@ -372,13 +484,17 @@ async function actualizarEstadoTurno(req, res) {
     barberoFinal !== turnoActual.barbero;
 
   if (cambioAgenda && barberoFinal && fechaFinal && horaFinal) {
-    const { data: turnosMismoHorario, error: errorOcupado } = await supabaseAdmin
-      .from("turnos")
-      .select("id")
-      .eq("hora", horaFinal)
-      .eq("barbero", barberoFinal)
-      .eq("fecha", fechaFinal)
-      .eq("barberia_id", barberia_id);
+    const { data: turnosMismoHorario, error: errorOcupado } = await perf.measure(
+      "disponibilidad",
+      () => supabaseAdmin
+        .from("turnos")
+        .select("id")
+        .eq("hora", horaFinal)
+        .eq("barbero", barberoFinal)
+        .eq("fecha", fechaFinal)
+        .eq("barberia_id", barberia_id),
+      1
+    );
 
     if (errorOcupado) return res.status(500).json({ error: "Error verificando disponibilidad" });
     if ((turnosMismoHorario || []).some((turno) => turno.id !== id)) {
@@ -391,19 +507,27 @@ async function actualizarEstadoTurno(req, res) {
     cambios.recordatorio_3h = false;
   }
 
-  let { error } = await supabaseAdmin
-    .from("turnos")
-    .update(cambios)
-    .eq("id", id)
-    .eq("barberia_id", barberia_id);
+  let { error } = await perf.measure(
+    "update",
+    () => supabaseAdmin
+      .from("turnos")
+      .update(cambios)
+      .eq("id", id)
+      .eq("barberia_id", barberia_id),
+    1
+  );
 
   if (isMissingColumnError(error, "barbero_id") && Object.prototype.hasOwnProperty.call(cambios, "barbero_id")) {
     console.log("⚠️ turnos.barbero_id no existe en DB; reintentando update sin barbero_id");
-    ({ error } = await supabaseAdmin
-      .from("turnos")
-      .update(withoutField(cambios, "barbero_id"))
-      .eq("id", id)
-      .eq("barberia_id", barberia_id));
+    ({ error } = await perf.measure(
+      "updateSinBarberoId",
+      () => supabaseAdmin
+        .from("turnos")
+        .update(withoutField(cambios, "barbero_id"))
+        .eq("id", id)
+        .eq("barberia_id", barberia_id),
+      1
+    ));
   }
 
   if (error) return res.status(500).json({ error });
