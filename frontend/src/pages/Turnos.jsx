@@ -99,6 +99,7 @@ function buildPagoPanelFallback(turno, pagoInfo) {
 function PagosPanel({ turno, pagoInfo, onChanged, onToast }) {
   const initialData = buildPagoPanelFallback(turno, pagoInfo);
   const [data, setData] = useState(initialData);
+  const cargarRequestId = useRef(0);
   const [productos, setProductos] = useState([]);
   const [productoForm, setProductoForm] = useState({ producto_id: "", cantidad: 1 });
   const [form, setForm] = useState({
@@ -113,11 +114,13 @@ function PagosPanel({ turno, pagoInfo, onChanged, onToast }) {
   const [error, setError] = useState("");
 
   const cargar = useCallback(async () => {
-    if (!turno?.id) return;
+    if (!turno?.id) return null;
+    const requestId = ++cargarRequestId.current;
     setLoading(true);
     setError("");
     try {
       const resumen = await pagosApi.byTurno(turno.id, { legacyCompletados: "1" });
+      if (requestId !== cargarRequestId.current) return null;
       const saldo = Number(resumen?.saldo || 0);
       const total = Number(resumen?.total_cobrable ?? turno?.precio ?? 0);
       setData(resumen);
@@ -125,10 +128,12 @@ function PagosPanel({ turno, pagoInfo, onChanged, onToast }) {
         ...prev,
         monto: saldo > 0 ? String(saldo) : resumen?.pago_historico && total > 0 ? String(total) : "",
       }));
+      return resumen;
     } catch (err) {
-      setError(err.message);
+      if (requestId === cargarRequestId.current) setError(err.message);
+      return null;
     } finally {
-      setLoading(false);
+      if (requestId === cargarRequestId.current) setLoading(false);
     }
   }, [turno?.id, turno?.precio]);
 
@@ -136,15 +141,22 @@ function PagosPanel({ turno, pagoInfo, onChanged, onToast }) {
     const fallback = buildPagoPanelFallback(turno, pagoInfo);
     const saldo = Number(fallback?.saldo || 0);
     const total = Number(fallback?.total_cobrable ?? turno?.precio ?? 0);
-    setData(fallback);
+    setData((prev) => ({
+      ...fallback,
+      pagos: Array.isArray(pagoInfo?.pagos) ? pagoInfo.pagos : (prev?.pagos || []),
+      productos: Array.isArray(pagoInfo?.productos) ? pagoInfo.productos : (prev?.productos || []),
+    }));
     setForm({
       monto: saldo > 0 ? String(saldo) : fallback?.pago_historico && total > 0 ? String(total) : "",
       metodo: "efectivo",
       tipo: "pago_total",
       nota: "",
     });
+  }, [pagoInfo, turno]);
+
+  useEffect(() => {
     cargar();
-  }, [cargar, pagoInfo, turno]);
+  }, [cargar]);
 
   useEffect(() => {
     productosApi.list()
@@ -180,8 +192,8 @@ function PagosPanel({ turno, pagoInfo, onChanged, onToast }) {
         nota: form.nota || undefined,
       });
       setForm((prev) => ({ ...prev, nota: "" }));
-      await cargar();
-      onChanged?.();
+      const resumen = await cargar();
+      if (resumen) onChanged?.(turno.id, resumen);
       onToast?.("Pago registrado");
     } catch (err) {
       setError(err.message);
@@ -195,8 +207,8 @@ function PagosPanel({ turno, pagoInfo, onChanged, onToast }) {
     setError("");
     try {
       await pagosApi.anular(id, "Anulado desde turnos");
-      await cargar();
-      onChanged?.();
+      const resumen = await cargar();
+      if (resumen) onChanged?.(turno.id, resumen);
       onToast?.("Pago anulado");
     } catch (err) {
       setError(err.message);
@@ -223,8 +235,8 @@ function PagosPanel({ turno, pagoInfo, onChanged, onToast }) {
         cantidad: Number(productoForm.cantidad),
       });
       setProductoForm({ producto_id: "", cantidad: 1 });
-      await cargar();
-      onChanged?.();
+      const resumen = await cargar();
+      if (resumen) onChanged?.(turno.id, resumen);
       onToast?.("Producto agregado al turno");
     } catch (err) {
       setError(err.message);
@@ -237,8 +249,8 @@ function PagosPanel({ turno, pagoInfo, onChanged, onToast }) {
     setError("");
     try {
       await pagosApi.removeProductoTurno(itemId);
-      await cargar();
-      onChanged?.();
+      const resumen = await cargar();
+      if (resumen) onChanged?.(turno.id, resumen);
       onToast?.("Producto quitado del turno");
     } catch (err) {
       setError(err.message);
@@ -443,6 +455,11 @@ export default function Turnos({ user }) {
   const [editando, setEditando] = useState({ id: null, valores: null });
   const [pagosPorTurno, setPagosPorTurno] = useState({});
   const [turnoPagosAbierto, setTurnoPagosAbierto] = useState(null);
+
+  const actualizarPagoTurno = useCallback((turnoId, resumen) => {
+    if (!turnoId || !resumen) return;
+    setPagosPorTurno((prev) => ({ ...prev, [turnoId]: resumen }));
+  }, []);
 
   const cargarEstadosPago = useCallback(async (turnosBase = []) => {
     if (!turnosBase.length) {
@@ -1049,9 +1066,7 @@ export default function Turnos({ user }) {
                     <PagosPanel
                       turno={t}
                       pagoInfo={pagoInfo}
-                      onChanged={() => {
-                        traerTurnos();
-                      }}
+                      onChanged={actualizarPagoTurno}
                       onToast={mostrarToast}
                     />
                   )}
@@ -1296,9 +1311,7 @@ export default function Turnos({ user }) {
                           <PagosPanel
                             turno={t}
                             pagoInfo={pagoInfo}
-                            onChanged={() => {
-                              traerTurnos();
-                            }}
+                            onChanged={actualizarPagoTurno}
                             onToast={mostrarToast}
                           />
                         </td>
